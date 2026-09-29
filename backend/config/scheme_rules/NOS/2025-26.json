@@ -1,0 +1,67 @@
+[
+  {
+    "rule_id": "NOS_2025_COMMUNITY",
+    "category": "ELIGIBILITY",
+    "field": "applicant.community",
+    "operator": "IN_SET",
+    "value": ["ST", "PVTG"],
+    "severity": "BLOCKING",
+    "source_document": "National Overseas Scholarship Scheme for Scheduled Tribe Candidates (NOS) Guidelines 2025-26",
+    "source_url": "https://overseas.tribal.gov.in/",
+    "source_excerpt": "The scheme is open to Scheduled Tribe (ST) candidates including Particularly Vulnerable Tribal Groups (PVTGs).",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2025_STUDY_ABROAD",
+    "category": "ELIGIBILITY",
+    "field": "application.study_destination",
+    "operator": "EQUALS",
+    "value": "ABROAD",
+    "severity": "BLOCKING",
+    "source_document": "National Overseas Scholarship Scheme for Scheduled Tribe Candidates (NOS) Guidelines 2025-26",
+    "source_url": "https://overseas.tribal.gov.in/",
+    "source_excerpt": "Financial assistance is provided to pursue higher studies abroad.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2025_DEGREE_LEVELS",
+    "category": "ELIGIBILITY",
+    "field": "application.course_level",
+    "operator": "IN_SET",
+    "value": ["Master", "PhD", "Post-Doctoral"],
+    "severity": "BLOCKING",
+    "source_document": "National Overseas Scholarship Scheme for Scheduled Tribe Candidates (NOS) Guidelines 2025-26",
+    "source_url": "https://overseas.tribal.gov.in/",
+    "source_excerpt": "Courses covered are Masters Degree, Ph.D., and Post-Doctoral research.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2025_INCOME_CEILING",
+    "category": "ELIGIBILITY",
+    "field": "applicant.annual_family_income",
+    "operator": "LESS_THAN_OR_EQUAL",
+    "value": 600000,
+    "severity": "BLOCKING",
+    "source_document": "National Overseas Scholarship Scheme for Scheduled Tribe Candidates (NOS) Guidelines 2025-26",
+    "source_url": "https://overseas.tribal.gov.in/",
+    "source_excerpt": "Total family income from all sources should not exceed Rs. 6,00,000 per annum.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2025_AGE_LIMIT",
+    "category": "ELIGIBILITY",
+    "field": "applicant.age_on_july_1",
+    "operator": "LESS_THAN_OR_EQUAL",
+    "value": 35,
+    "severity": "BLOCKING",
+    "source_document": "National Overseas Scholarship Scheme for Scheduled Tribe Candidates (NOS) Guidelines 2025-26",
+    "source_url": "https://overseas.tribal.gov.in/",
+    "source_excerpt": "Not more than 35 years as on 1st July of the selection year for Ph.D. candidates (32 for Masters, 38 for Post-Doc).",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  }
+]

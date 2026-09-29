@@ -1,0 +1,54 @@
+[
+  {
+    "rule_id": "TOP_CLASS_2025_ST_COMMUNITY",
+    "category": "ELIGIBILITY",
+    "field": "applicant.community",
+    "operator": "EQUALS",
+    "value": "ST",
+    "severity": "BLOCKING",
+    "source_document": "National Fellowship and Scholarship for Higher Education of ST Students - Top Class Education Scheme Guidelines 2025-26",
+    "source_url": "https://tribal.nic.in/ScholarshiP.aspx",
+    "source_excerpt": "Scholarship is open to Scheduled Tribe (ST) students only.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "TOP_CLASS_2025_INCOME_CEILING",
+    "category": "ELIGIBILITY",
+    "field": "applicant.annual_family_income",
+    "operator": "LESS_THAN_OR_EQUAL",
+    "value": 600000,
+    "severity": "BLOCKING",
+    "source_document": "National Fellowship and Scholarship for Higher Education of ST Students - Top Class Education Scheme Guidelines 2025-26",
+    "source_url": "https://tribal.nic.in/ScholarshiP.aspx",
+    "source_excerpt": "Total family income of the candidate to be eligible for this scheme is Rs. 6.00 lakh per annum from all sources.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "TOP_CLASS_2025_PREMIER_INSTITUTE",
+    "category": "ELIGIBILITY",
+    "field": "application.institute_code",
+    "operator": "IN_SET",
+    "value": "TOP_CLASS_PREMIER_INSTITUTES_SAMPLE",
+    "severity": "BLOCKING",
+    "source_document": "Annexure I: Roster of 265 Premier Educational Institutes under Top Class Education Scheme AY 2025-26",
+    "source_url": "https://tribal.nic.in/TopClass_Institutes.aspx",
+    "source_excerpt": "The scholarship is available for studying in 265 premier institutions notified by the Ministry of Tribal Affairs.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "TOP_CLASS_2025_DOC_INCOME_CERT",
+    "category": "DOCUMENT",
+    "field": "documents.income_certificate",
+    "operator": "EXISTS",
+    "value": true,
+    "severity": "BLOCKING",
+    "source_document": "National Fellowship and Scholarship for Higher Education of ST Students - Top Class Education Scheme Guidelines 2025-26",
+    "source_url": "https://tribal.nic.in/ScholarshiP.aspx",
+    "source_excerpt": "Income certificate issued by the competent authority in the State/UT Government.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "rule_id": "NOS_2026_COMMUNITY",
+    "category": "ELIGIBILITY",
+    "field": "applicant.community",
+    "operator": "IN_SET",
+    "value": ["ST", "PVTG"],
+    "severity": "BLOCKING",
+    "source_document": "MoTA Notification: Amendment in eligibility criteria and courses covered under the NOS Scheme for ST Students from 2026-27",
+    "source_url": "https://overseas.tribal.gov.in/amendments/2026-27",
+    "source_excerpt": "The scheme is open to Scheduled Tribe (ST) candidates including Particularly Vulnerable Tribal Groups (PVTGs).",
+    "academic_year": "2026-27",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2026_INCOME_CEILING",
+    "category": "ELIGIBILITY",
+    "field": "applicant.annual_family_income",
+    "operator": "LESS_THAN_OR_EQUAL",
+    "value": 600000,
+    "severity": "BLOCKING",
+    "source_document": "MoTA Notification: Amendment in eligibility criteria and courses covered under the NOS Scheme for ST Students from 2026-27",
+    "source_url": "https://overseas.tribal.gov.in/amendments/2026-27",
+    "source_excerpt": "Total family income from all sources should not exceed Rs. 6,00,000 per annum.",
+    "academic_year": "2026-27",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2026_EXCLUDE_BACHELORS",
+    "category": "ELIGIBILITY",
+    "field": "application.course_level",
+    "operator": "IN_SET",
+    "value": ["Master", "PhD", "Post-Doctoral"],
+    "severity": "BLOCKING",
+    "source_document": "MoTA Notification: Amendment in eligibility criteria and courses covered under the NOS Scheme for ST Students from 2026-27",
+    "source_url": "https://overseas.tribal.gov.in/amendments/2026-27",
+    "source_excerpt": "Bachelor-level courses in any discipline are not covered under this scheme. Only Masters, Ph.D., and Post-Doctoral research are eligible.",
+    "academic_year": "2026-27",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2026_QS_TOP_1000",
+    "category": "ELIGIBILITY",
+    "field": "application.foreign_university_qs_rank",
+    "operator": "LESS_THAN_OR_EQUAL",
+    "value": 1000,
+    "severity": "BLOCKING",
+    "source_document": "MoTA Notification: Amendment in eligibility criteria and courses covered under the NOS Scheme for ST Students from 2026-27",
+    "source_url": "https://overseas.tribal.gov.in/amendments/2026-27",
+    "source_excerpt": "Candidate must have secured admission into a foreign university/institution ranked within the top 1,000 in the latest QS World University Rankings.",
+    "academic_year": "2026-27",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2026_RESTRICTED_INDIAN_SUBJECTS",
+    "category": "ELIGIBILITY",
+    "field": "application.is_indian_culture_or_heritage_topic",
+    "operator": "EQUALS",
+    "value": false,
+    "severity": "BLOCKING",
+    "source_document": "MoTA Notification: Amendment in eligibility criteria and courses covered under the NOS Scheme for ST Students from 2026-27",
+    "source_url": "https://overseas.tribal.gov.in/amendments/2026-27",
+    "source_excerpt": "Topics/courses concerning Indian Culture, Heritage, History & Social Studies on India based research would not be eligible for funding under the scheme.",
+    "academic_year": "2026-27",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NOS_2026_DIGILOCKER_VERIFICATION",
+    "category": "WORKFLOW",
+    "field": "applicant.digilocker_verified",
+    "operator": "EQUALS",
+    "value": true,
+    "severity": "BLOCKING",
+    "source_document": "MoTA Notification: Amendment in eligibility criteria and courses covered under the NOS Scheme for ST Students from 2026-27",
+    "source_url": "https://overseas.tribal.gov.in/amendments/2026-27",
+    "source_excerpt": "Applicants must complete document submission and verification via the integrated DigiLocker workflow.",
+    "academic_year": "2026-27",
+    "confidence": "OFFICIAL"
+  }
+]

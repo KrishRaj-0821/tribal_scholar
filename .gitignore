@@ -1,0 +1,36 @@
+# Python & Django
+*.py[cod]
+__pycache__/
+*.so
+.Python
+backend/db.sqlite3
+backend/db.sqlite3-journal
+media/
+staticfiles/
+*.log
+
+# Virtual Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Node & Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+# Environment & Secrets
+.env
+.env.*
+backend/.env
+backend/.env.*
+!.env.example
+.pgdata/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

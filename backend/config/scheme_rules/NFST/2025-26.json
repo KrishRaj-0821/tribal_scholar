@@ -1,0 +1,93 @@
+[
+  {
+    "rule_id": "NFST_2025_ST_COMMUNITY",
+    "category": "ELIGIBILITY",
+    "field": "applicant.community",
+    "operator": "EQUALS",
+    "value": "ST",
+    "severity": "BLOCKING",
+    "source_document": "MoTA National Fellowship for Higher Education of ST Students (NFST) Guidelines & Advertisement 2025-26",
+    "source_url": "https://fellowship.tribal.gov.in/",
+    "source_excerpt": "The candidate must belong to a Scheduled Tribe (ST) notified under Article 342.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NFST_2025_PHD_ENROLMENT",
+    "category": "ELIGIBILITY",
+    "field": "application.course_level",
+    "operator": "IN_SET",
+    "value": ["PhD", "Integrated M.Phil + Ph.D."],
+    "severity": "BLOCKING",
+    "source_document": "MoTA National Fellowship for Higher Education of ST Students (NFST) Guidelines & Advertisement 2025-26",
+    "source_url": "https://fellowship.tribal.gov.in/",
+    "source_excerpt": "Candidate must have secured admission into regular and full time M.Phil/Ph.D. program in recognized institutions.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NFST_2025_INSTITUTION_ELIGIBILITY",
+    "category": "ELIGIBILITY",
+    "field": "application.institute_code",
+    "operator": "IN_SET",
+    "value": "NFST_RECOGNIZED_INSTITUTIONS_SAMPLE",
+    "severity": "BLOCKING",
+    "source_document": "MoTA List of Empanelled Universities & UGC Recognized Institutions for NFST AY 2025-26",
+    "source_url": "https://tribal.nic.in/NFST_Institutes.aspx",
+    "source_excerpt": "Universities/Institutes/Colleges recognized by UGC under Section 2(f) and 12(B) or declared as Institutes of National Importance.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NFST_2025_PREFERENCE_PVTG",
+    "category": "PREFERENCE",
+    "field": "applicant.is_pvtg",
+    "operator": "EQUALS",
+    "value": true,
+    "severity": "WARNING",
+    "source_document": "MoTA National Fellowship for Higher Education of ST Students (NFST) Guidelines & Advertisement 2025-26",
+    "source_url": "https://fellowship.tribal.gov.in/",
+    "source_excerpt": "Preference will be given to candidates belonging to Particularly Vulnerable Tribal Groups (PVTGs).",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NFST_2025_PREFERENCE_DIVYANGJAN",
+    "category": "PREFERENCE",
+    "field": "applicant.is_disabled",
+    "operator": "EQUALS",
+    "value": true,
+    "severity": "WARNING",
+    "source_document": "MoTA National Fellowship for Higher Education of ST Students (NFST) Guidelines & Advertisement 2025-26",
+    "source_url": "https://fellowship.tribal.gov.in/",
+    "source_excerpt": "Preference shall be given to Divyangjan (Persons with Disabilities) ST scholars.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NFST_2025_DOC_CASTE_CERT",
+    "category": "DOCUMENT",
+    "field": "documents.caste_certificate",
+    "operator": "EXISTS",
+    "value": true,
+    "severity": "BLOCKING",
+    "source_document": "MoTA National Fellowship for Higher Education of ST Students (NFST) Guidelines & Advertisement 2025-26",
+    "source_url": "https://fellowship.tribal.gov.in/",
+    "source_excerpt": "Valid ST certificate issued by competent authority in the prescribed format.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  },
+  {
+    "rule_id": "NFST_2025_DOC_ADMISSION_LETTER",
+    "category": "DOCUMENT",
+    "field": "documents.admission_letter",
+    "operator": "EXISTS",
+    "value": true,
+    "severity": "BLOCKING",
+    "source_document": "MoTA National Fellowship for Higher Education of ST Students (NFST) Guidelines & Advertisement 2025-26",
+    "source_url": "https://fellowship.tribal.gov.in/",
+    "source_excerpt": "Certificate of admission/registration to the regular full-time Ph.D. course.",
+    "academic_year": "2025-26",
+    "confidence": "OFFICIAL"
+  }
+]
