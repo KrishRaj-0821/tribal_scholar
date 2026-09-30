@@ -8,37 +8,20 @@ from django.core.exceptions import ValidationError
 from rest_framework.test import APIClient
 from rest_framework import status
 
-# ---------------------------------------------------------------------------
-# POSTGRESQL GUARD
-# The three multi-threaded tests below encode PostgreSQL transactional
-# guarantees (SELECT FOR UPDATE, row-level locking, MVCC). SQLite serialises
-# all writers with a single global lock and raises:
-#   OperationalError: database table is locked
-# under concurrent threads — it cannot satisfy these invariants by design.
-#
-# The 4 remaining single-threaded tests in this file run correctly on SQLite.
-#
-# To run the full suite including the 3 PostgreSQL-only tests, set:
-#   POSTGRES_DB=tribal_scholar
-#   POSTGRES_USER=<your_user>
-#   POSTGRES_PASSWORD=<your_password>
-#   POSTGRES_HOST=127.0.0.1
-#   POSTGRES_PORT=5432
-# See .env.example for the full placeholder list.
-# ---------------------------------------------------------------------------
-def _using_postgresql() -> bool:
-    from django.conf import settings
-    engine = settings.DATABASES.get('default', {}).get('ENGINE', '')
-    return 'postgresql' in engine or 'postgis' in engine
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.requires_postgresql,
+]
 
-
-_skip_without_pg = pytest.mark.skipif(
-    not _using_postgresql(),
-    reason=(
-        "Requires PostgreSQL (SELECT FOR UPDATE / row-level locking). "
-        "Configure POSTGRES_DB env var to enable. See .env.example."
-    ),
-)
+@pytest.fixture(autouse=True)
+def ensure_postgresql_backend(db):
+    """
+    STRICT INTEGRITY GATE:
+    Concurrency tests must NEVER skip. If the active database backend is not PostgreSQL,
+    fail immediately with a clear assertion.
+    """
+    from django.db import connection
+    assert connection.vendor == "postgresql", "Concurrency tests require PostgreSQL."
 
 from apps.accounts.models import User, UserRole
 from apps.applicants.models import ApplicantProfile
@@ -179,7 +162,6 @@ def stress_env(db):
 # =============================================================================
 # 5 & 7. ACTUAL CONCURRENCY STRESS TEST (20 CONCURRENT SUBMISSIONS - DIFFERENT KEYS)
 # =============================================================================
-@_skip_without_pg
 @pytest.mark.django_db(transaction=True)
 def test_concurrency_stress_20_different_keys_single_winner(stress_env):
     """
@@ -262,7 +244,6 @@ def test_concurrency_stress_20_different_keys_single_winner(stress_env):
 # =============================================================================
 # 6. SAME IDEMPOTENCY KEY RACE (20 CONCURRENT SUBMISSIONS - IDENTICAL KEY)
 # =============================================================================
-@_skip_without_pg
 @pytest.mark.django_db(transaction=True)
 def test_same_idempotency_key_race_20_threads_zero_duplicates(stress_env):
     """
@@ -324,7 +305,6 @@ def test_same_idempotency_key_race_20_threads_zero_duplicates(stress_env):
 # =============================================================================
 # 8. CONCURRENT FIELD PATCH (10 CONCURRENT PATCH REQUESTS WITH STALE REVISION)
 # =============================================================================
-@_skip_without_pg
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_field_patch_10_requests_stale_revisions_produce_409(stress_env):
     """

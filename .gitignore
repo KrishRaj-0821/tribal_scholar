@@ -24,10 +24,20 @@ dist/
 # Environment & Secrets
 .env
 .env.*
+*.env.local
 backend/.env
 backend/.env.*
 !.env.example
 .pgdata/
+.pgdata
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+credentials.json
+*credentials*.json
 
 # IDE & OS
 .vscode/

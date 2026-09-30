@@ -19,9 +19,33 @@ class AuditAction(models.TextChoices):
     DUPLICATE_FLAGGED = 'DUPLICATE_FLAGGED', 'Possible Duplicate Application Flagged'
     FIELD_VALUE_CHANGED = 'FIELD_VALUE_CHANGED', 'Field Value Changed'
     DOCUMENT_ADDED = 'DOCUMENT_ADDED', 'Document Added'
+    DOCUMENT_UPLOAD_INITIATED = 'DOCUMENT_UPLOAD_INITIATED', 'Document Upload Initiated'
+    DOCUMENT_UPLOADED = 'DOCUMENT_UPLOADED', 'Document Uploaded'
+    DOCUMENT_HASHED = 'DOCUMENT_HASHED', 'Document Cryptographically Hashed'
+    DOCUMENT_SCAN_STARTED = 'DOCUMENT_SCAN_STARTED', 'Document Malware Scan Started'
+    DOCUMENT_SCAN_COMPLETED = 'DOCUMENT_SCAN_COMPLETED', 'Document Malware Scan Completed'
+    DOCUMENT_REJECTED = 'DOCUMENT_REJECTED', 'Document Rejected by Security Engine'
+    DOCUMENT_PROMOTED = 'DOCUMENT_PROMOTED', 'Document Promoted to Safe Storage'
+    DOCUMENT_VIEWED = 'DOCUMENT_VIEWED', 'Document Viewed or Streamed'
+    DOCUMENT_REVOKED = 'DOCUMENT_REVOKED', 'Document Revoked'
+    DOCUMENT_VERSION_CREATED = 'DOCUMENT_VERSION_CREATED', 'Document Version Created'
     DEFICIENCY_RAISED = 'DEFICIENCY_RAISED', 'Deficiency Raised'
     DEFICIENCY_RESPONDED = 'DEFICIENCY_RESPONDED', 'Deficiency Responded'
     DEFICIENCY_RESOLVED = 'DEFICIENCY_RESOLVED', 'Deficiency Resolved'
+    OCR_JOB_CREATED = 'OCR_JOB_CREATED', 'OCR Job Created'
+    OCR_STARTED = 'OCR_STARTED', 'OCR Processing Started'
+    OCR_COMPLETED = 'OCR_COMPLETED', 'OCR Processing Completed'
+    OCR_FAILED = 'OCR_FAILED', 'OCR Processing Failed'
+    OCR_RETRIED = 'OCR_RETRIED', 'OCR Processing Retried'
+    DOCUMENT_CLASSIFIED = 'DOCUMENT_CLASSIFIED', 'Document Classified'
+    FIELD_EXTRACTED = 'FIELD_EXTRACTED', 'Provisional Field Extracted'
+    FIELD_CONFLICT_DETECTED = 'FIELD_CONFLICT_DETECTED', 'Field Conflict Detected'
+    DOCUMENT_VERIFICATION_STARTED = 'DOCUMENT_VERIFICATION_STARTED', 'Document Verification Started'
+    FIELD_VERIFIED = 'FIELD_VERIFIED', 'Field Verified by Officer'
+    FIELD_REJECTED = 'FIELD_REJECTED', 'Field Rejected by Officer'
+    FIELD_CONFLICT_RESOLVED = 'FIELD_CONFLICT_RESOLVED', 'Field Conflict Resolved by Officer'
+    DOCUMENT_VERIFICATION_COMPLETED = 'DOCUMENT_VERIFICATION_COMPLETED', 'Document Verification Completed'
+    DOCUMENT_VERIFICATION_REOPENED = 'DOCUMENT_VERIFICATION_REOPENED', 'Document Verification Reopened'
 
 class AuditQuerySet(models.QuerySet):
     """Prevent bulk modifications or deletions on audit records."""
@@ -51,7 +75,7 @@ class AuditLog(models.Model):
     actor_role = models.CharField(max_length=50, blank=True, help_text="Role at time of action")
     entity_type = models.CharField(max_length=100, help_text="Model class or domain aggregate (e.g. SchemeRule)")
     entity_id = models.CharField(max_length=100, help_text="Primary key identifier of targeted entity")
-    action = models.CharField(max_length=30, choices=AuditAction.choices)
+    action = models.CharField(max_length=50, choices=AuditAction.choices)
     before_json = models.JSONField(null=True, blank=True, help_text="State snapshot before mutation")
     after_json = models.JSONField(null=True, blank=True, help_text="State snapshot after mutation")
     reason = models.TextField(blank=True, help_text="Justification provided by actor")

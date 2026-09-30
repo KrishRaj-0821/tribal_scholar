@@ -12,8 +12,8 @@ export default defineConfig({
         name: 'Ministry of Tribal Affairs - Tribal Scholar Platform',
         short_name: 'TribalScholar',
         description: 'AI-Enabled Scholarship and Fellowship Management System (MoTA SIH 26239)',
-        theme_color: '#0f172a',
-        background_color: '#0b0f19',
+        theme_color: '#1D0A69',
+        background_color: '#F4F6F8',
         display: 'standalone',
         icons: [
           {
