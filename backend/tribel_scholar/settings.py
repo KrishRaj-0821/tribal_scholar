@@ -131,17 +131,17 @@ elif 'postgres' in DATABASE_ENGINE_ENV:
     if database_url:
         import urllib.parse
         url = urllib.parse.urlparse(database_url)
-        postgres_db = url.path.lstrip('/')
-        postgres_user = url.username or 'postgres'
-        postgres_password = url.password or ''
+        postgres_db = urllib.parse.unquote(url.path.lstrip('/'))
+        postgres_user = urllib.parse.unquote(url.username or 'postgres')
+        postgres_password = urllib.parse.unquote(url.password or '')
         postgres_host = url.hostname or '127.0.0.1'
         postgres_port = str(url.port or 5432)
     else:
-        postgres_db = os.getenv('POSTGRES_DB', os.getenv('PGDATABASE', os.getenv('DB_NAME', 'tribal_scholar')))
-        postgres_user = os.getenv('POSTGRES_USER', os.getenv('PGUSER', os.getenv('DB_USER', 'postgres')))
-        postgres_password = os.getenv('POSTGRES_PASSWORD', os.getenv('PGPASSWORD', os.getenv('DB_PASSWORD', '')))
-        postgres_host = os.getenv('POSTGRES_HOST', os.getenv('PGHOST', os.getenv('DB_HOST', '127.0.0.1')))
-        postgres_port = str(os.getenv('POSTGRES_PORT', os.getenv('PGPORT', os.getenv('DB_PORT', '5432'))))
+        postgres_db = os.getenv('POSTGRES_DB') or os.getenv('PGDATABASE') or os.getenv('DB_NAME') or 'tribal_scholar'
+        postgres_user = os.getenv('POSTGRES_USER') or os.getenv('PGUSER') or os.getenv('DB_USER') or 'postgres'
+        postgres_password = os.getenv('POSTGRES_PASSWORD') or os.getenv('PGPASSWORD') or os.getenv('DB_PASSWORD') or ''
+        postgres_host = os.getenv('POSTGRES_HOST') or os.getenv('PGHOST') or os.getenv('DB_HOST') or '127.0.0.1'
+        postgres_port = str(os.getenv('POSTGRES_PORT') or os.getenv('PGPORT') or os.getenv('DB_PORT') or '5432')
 
     if not postgres_db:
         from django.core.exceptions import ImproperlyConfigured
@@ -190,7 +190,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'

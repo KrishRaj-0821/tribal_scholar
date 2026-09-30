@@ -3,6 +3,27 @@ set -e
 
 echo "=== [Railway Deploy] Starting Tribal Scholar Backend ==="
 
+# 0. Wait for database connection to be ready
+echo "==> Verifying database connection..."
+python - << 'EOF'
+import sys, time, os, django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tribel_scholar.settings")
+django.setup()
+from django.db import connection
+
+for attempt in range(1, 31):
+    try:
+        connection.ensure_connection()
+        print("Database connection verified successfully!")
+        sys.exit(0)
+    except Exception as e:
+        print(f"[Attempt {attempt}/30] Database not ready yet: {e}")
+        time.sleep(2)
+
+print("ERROR: Database connection timed out after 60 seconds.")
+sys.exit(1)
+EOF
+
 # 1. Apply database migrations
 echo "==> Running database migrations..."
 python manage.py migrate --noinput

@@ -79,29 +79,28 @@ This is the fastest, standard method with zero CLI setup and automatic GitHub de
 
 ---
 
-## 💻 Option B: Deploy via Railway CLI
+## 💻 Option B: Deploy via Railway CLI / Infrastructure as Code (IaC)
 
-If you prefer deploying directly from your terminal:
+The repository uses Railway's official Infrastructure as Code engine (`.railway/railway.ts`), defining both the Django backend and Vite/React frontend with their respective Dockerfiles, healthchecks, and database connections.
 
-### 1. Authenticate with Railway
+### 1. Preview Changes with Railway IaC Plan
 ```bash
-npx @railway/cli login
-```
-*(Follow browser prompt or use `npx @railway/cli login --browserless` if on a remote terminal).*
-
-### 2. Initialize and Link Project
-```bash
-# Create new project linked to current directory
-npx @railway/cli init
-
-# Add PostgreSQL and Redis
-npx @railway/cli add --database postgres
-npx @railway/cli add --database redis
+npx railway config plan
 ```
 
-### 3. Deploy
+### 2. Apply Infrastructure Changes
 ```bash
-npx @railway/cli up
+npx railway config apply --yes
+```
+
+### 3. Deploy from Git or CLI
+```bash
+# Push directly to GitHub to trigger automatic multi-service Railway deployment:
+git push origin main
+
+# Or upload code directly from terminal:
+npx railway up --service backend
+npx railway up --service frontend
 ```
 
 ---
