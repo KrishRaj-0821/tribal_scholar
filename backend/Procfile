@@ -1,0 +1,2 @@
+web: gunicorn tribel_scholar.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4
+worker: celery -A tribel_scholar worker --loglevel=info

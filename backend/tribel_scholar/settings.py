@@ -26,7 +26,11 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-mota-sih-26239-foun
 
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
+
+# CSRF Trusted Origins for HTTPS (e.g. Railway domains *.railway.app, *.up.railway.app)
+csrf_trusted_env = os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.railway.app,https://*.up.railway.app')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_env.split(',') if origin.strip()]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -56,6 +60,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -122,16 +127,26 @@ if DATABASE_ENGINE_ENV == 'sqlite':
         }
     }
 elif 'postgres' in DATABASE_ENGINE_ENV:
-    postgres_db = os.getenv('POSTGRES_DB', os.getenv('DB_NAME', 'tribal_scholar'))
-    postgres_user = os.getenv('POSTGRES_USER', os.getenv('DB_USER', 'postgres'))
-    postgres_password = os.getenv('POSTGRES_PASSWORD', os.getenv('DB_PASSWORD', ''))
-    postgres_host = os.getenv('POSTGRES_HOST', os.getenv('DB_HOST', '127.0.0.1'))
-    postgres_port = os.getenv('POSTGRES_PORT', os.getenv('DB_PORT', '5432'))
+    database_url = os.getenv('DATABASE_URL')
+    if database_url:
+        import urllib.parse
+        url = urllib.parse.urlparse(database_url)
+        postgres_db = url.path.lstrip('/')
+        postgres_user = url.username or 'postgres'
+        postgres_password = url.password or ''
+        postgres_host = url.hostname or '127.0.0.1'
+        postgres_port = str(url.port or 5432)
+    else:
+        postgres_db = os.getenv('POSTGRES_DB', os.getenv('PGDATABASE', os.getenv('DB_NAME', 'tribal_scholar')))
+        postgres_user = os.getenv('POSTGRES_USER', os.getenv('PGUSER', os.getenv('DB_USER', 'postgres')))
+        postgres_password = os.getenv('POSTGRES_PASSWORD', os.getenv('PGPASSWORD', os.getenv('DB_PASSWORD', '')))
+        postgres_host = os.getenv('POSTGRES_HOST', os.getenv('PGHOST', os.getenv('DB_HOST', '127.0.0.1')))
+        postgres_port = str(os.getenv('POSTGRES_PORT', os.getenv('PGPORT', os.getenv('DB_PORT', '5432'))))
 
     if not postgres_db:
         from django.core.exceptions import ImproperlyConfigured
         raise ImproperlyConfigured(
-            "PostgreSQL configuration is incomplete: POSTGRES_DB is required. "
+            "PostgreSQL configuration is incomplete: POSTGRES_DB or DATABASE_URL is required. "
             "Do NOT silently fall back to SQLite."
         )
 
@@ -173,8 +188,9 @@ TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -194,17 +210,24 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
 }
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-]
+cors_allowed_env = os.getenv('CORS_ALLOWED_ORIGINS')
+if cors_allowed_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_allowed_env.split(',') if origin.strip()]
+    CORS_ALLOW_ALL_ORIGINS = False
+else:
+    CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', str(DEBUG)).lower() in ('true', '1')
+    CORS_ALLOWED_ORIGINS = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ]
 
 # Redis Configuration
-REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
-REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
-REDIS_DB = int(os.getenv('REDIS_DB', '0'))
-REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+REDIS_URL = os.getenv('REDIS_URL') or os.getenv('REDIS_PRIVATE_URL')
+if not REDIS_URL:
+    REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+    REDIS_DB = int(os.getenv('REDIS_DB', '0'))
+    REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)

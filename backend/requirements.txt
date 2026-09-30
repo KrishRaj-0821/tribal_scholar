@@ -9,7 +9,11 @@ pytest>=8.0.0
 pytest-django>=4.8.0
 requests>=2.31.0
 Pillow>=10.0.0
+# Production WSGI & Static File Serving
+gunicorn>=23.0.0
+whitenoise>=6.8.0
 # Phase 7: Secure OCR & Document Intelligence Foundation
 paddlepaddle==3.3.1
 paddleocr==3.7.0
 pypdfium2==5.13.0
+
