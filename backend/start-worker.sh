@@ -7,7 +7,9 @@ export FLAGS_enable_pir_api=0
 export FLAGS_use_mkldnn=0
 export PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=0
 export KMP_DUPLICATE_LIB_OK=TRUE
-export OMP_NUM_THREADS=2
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 
 # Wait for database & redis
 python - << 'EOF'
@@ -56,5 +58,5 @@ for _ in range(10):
 CLAM_EOF
 fi
 
-echo "==> Starting Celery worker process (concurrency: 2, pool: threads)..."
-exec celery -A tribel_scholar worker --loglevel=info --concurrency=2 --pool=threads
+echo "==> Starting Celery worker process (pool: solo)..."
+exec celery -A tribel_scholar worker --loglevel=info --pool=solo

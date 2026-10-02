@@ -4,11 +4,14 @@ import json
 import logging
 import threading
 
-# Explicitly disable PIR with OneDNN regression on CPU
+# Explicitly disable PIR with OneDNN regression on CPU and force single-thread BLAS to prevent OpenBLAS SIGSEGV
 os.environ.setdefault('FLAGS_enable_pir_api', '0')
 os.environ.setdefault('FLAGS_use_mkldnn', '0')
 os.environ.setdefault('PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT', '0')
 os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
+os.environ.setdefault('OMP_NUM_THREADS', '1')
+os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
+os.environ.setdefault('MKL_NUM_THREADS', '1')
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
