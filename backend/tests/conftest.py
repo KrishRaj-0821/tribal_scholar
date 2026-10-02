@@ -98,13 +98,15 @@ def check_redis_availability_for_integration(request):
     """
     node_path = str(request.node.fspath).replace("\\", "/")
     if "tests/integration" in node_path or request.node.get_closest_marker("requires_redis"):
-        import redis
-        from django.conf import settings
-        host = getattr(settings, 'REDIS_HOST', '127.0.0.1')
-        port = int(getattr(settings, 'REDIS_PORT', 6379))
-        db = int(getattr(settings, 'REDIS_DB', 0))
-        try:
+        redis_url = getattr(settings, 'REDIS_URL', None)
+        if redis_url:
+            r = redis.from_url(redis_url, socket_timeout=2)
+        else:
+            host = getattr(settings, 'REDIS_HOST', '127.0.0.1')
+            port = int(getattr(settings, 'REDIS_PORT', 6379))
+            db = int(getattr(settings, 'REDIS_DB', 0))
             r = redis.Redis(host=host, port=port, db=db, socket_timeout=2)
+        try:
             if not r.ping():
                 raise AssertionError("Redis ping returned False")
         except Exception as exc:

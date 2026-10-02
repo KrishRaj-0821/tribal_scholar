@@ -265,6 +265,12 @@ if not REDIS_URL:
     REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
     REDIS_DB = int(os.getenv('REDIS_DB', '0'))
     REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+else:
+    from urllib.parse import urlparse
+    _parsed = urlparse(REDIS_URL)
+    REDIS_HOST = _parsed.hostname or '127.0.0.1'
+    REDIS_PORT = _parsed.port or 6379
+    REDIS_DB = int(_parsed.path.lstrip('/') or '0') if _parsed.path and _parsed.path.strip('/') else 0
 
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)

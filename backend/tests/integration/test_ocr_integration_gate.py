@@ -133,6 +133,9 @@ def make_clean_pdf(content_text: str = "Standard Income Certificate Rs. 450000")
 
 @pytest.fixture
 def redis_client():
+    redis_url = getattr(settings, 'REDIS_URL', None)
+    if redis_url:
+        return redis.from_url(redis_url)
     r = redis.Redis(
         host=getattr(settings, 'REDIS_HOST', '127.0.0.1'),
         port=int(getattr(settings, 'REDIS_PORT', 6379)),
