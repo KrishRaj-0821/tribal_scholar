@@ -74,7 +74,7 @@ class ProvisionalFieldExtractor:
                 pass
 
         # Look for direct numbers near currency symbols or keywords
-        num_match = re.search(r'(?:rs\.?|inr|₹)?\s*(\d{4,9})\b', cleaned, re.IGNORECASE)
+        num_match = re.search(r'(?:rs\.?|inr|\u20b9)?\s*(\d{4,9})\b', cleaned, re.IGNORECASE)
         if num_match:
             try:
                 return float(num_match.group(1))
@@ -106,7 +106,7 @@ class ProvisionalFieldExtractor:
                 }
 
                 # 1. Annual Family Income
-                if any(k in text_lower for k in ('income', 'annual', 'rs.', '₹', 'family income')):
+                if any(k in text_lower for k in ('income', 'annual', 'rs.', '\u20b9', 'family income')):
                     amount = cls._parse_currency(text)
                     if amount is not None and amount > 0:
                         candidates.append(
@@ -145,7 +145,7 @@ class ProvisionalFieldExtractor:
 
                 # 3. Certificate Number / Reference Number
                 cert_match = re.search(
-                    r'(?:certificate\s+no\.?|cert\.?\s+no\.?|ref\s+no\.?|sl\.?\s+no\.?|application\s+no\.?)[:\s]+([A-Z0-9\/\-_]{5,30})\b',
+                    r'(?:certificate\s*(?:no\.?|number)|cert\.?\s*(?:no\.?|number)|ref\s*(?:no\.?|number)|sl\.?\s*(?:no\.?|number)|application\s*(?:no\.?|number))[:\s]+([A-Z0-9\/\-_]{5,30})\b',
                     text,
                     re.IGNORECASE
                 )
@@ -205,25 +205,26 @@ class ProvisionalFieldExtractor:
                         )
 
                 # 6. Academic Year
-                acad_match = cls.ACADEMIC_YEAR_PATTERN.search(text)
-                if acad_match:
-                    y1 = acad_match.group(1)
-                    y2 = acad_match.group(2)
-                    norm_acad = f"{y1}-{y2[-2:]}" if len(y2) == 4 else f"{y1}-{y2}"
-                    candidates.append(
-                        ExtractedFieldCandidate(
-                            field_code="academic_year",
-                            field_label="Academic Year",
-                            raw_value=text,
-                            normalized_value=norm_acad,
-                            confidence=round(block.confidence * 0.93, 2),
-                            page_number=page_num,
-                            bounding_box=bbox,
-                            extraction_method="REGEX_ACADEMIC_YEAR",
-                            block_index=block_idx,
-                            pipeline_version=pipeline_ver
+                if not any(k in text_lower for k in ('certificate', 'cert', 'licence', 'order')):
+                    acad_match = cls.ACADEMIC_YEAR_PATTERN.search(text)
+                    if acad_match:
+                        y1 = acad_match.group(1)
+                        y2 = acad_match.group(2)
+                        norm_acad = f"{y1}-{y2[-2:]}" if len(y2) == 4 else f"{y1}-{y2}"
+                        candidates.append(
+                            ExtractedFieldCandidate(
+                                field_code="academic_year",
+                                field_label="Academic Year",
+                                raw_value=text,
+                                normalized_value=norm_acad,
+                                confidence=round(block.confidence * 0.93, 2),
+                                page_number=page_num,
+                                bounding_box=bbox,
+                                extraction_method="REGEX_ACADEMIC_YEAR",
+                                block_index=block_idx,
+                                pipeline_version=pipeline_ver
+                            )
                         )
-                    )
 
                 # 7. Applicant Name (from anchors like 'This is to certify that Shri/Smt/Kumari <Name>')
                 name_match = re.search(

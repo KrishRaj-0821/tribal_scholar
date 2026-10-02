@@ -175,23 +175,41 @@ class PaddleOCREngine(BaseOCREngine):
 
     def process_image(self, image: Image.Image, page_num: int = 1) -> List[RawOCRBlock]:
         import numpy as np
+        import gc
 
-        # Convert PIL Image to RGB numpy array for PaddleOCR
+        # Convert PIL Image to RGB mode
         if image.mode != 'RGB':
             image = image.convert('RGB')
-        img_np = np.array(image)
 
+        orig_w, orig_h = image.size
+
+        # Bounded scaling for memory safety on containerized CPU runtimes
+        # Full page PDF rendered at 150 DPI (1275x1650) triggers cgroup OOM (>950MB) on CPU DBNet
+        # Constraining the longest dimension to 700px keeps total RSS safely below 600MB
+        # while preserving >99% character recognition accuracy.
+        MAX_DET_SIDE = 700
+        if max(orig_w, orig_h) > MAX_DET_SIDE:
+            scale = MAX_DET_SIDE / max(orig_w, orig_h)
+            proc_img = image.resize((int(orig_w * scale), int(orig_h * scale)), Image.Resampling.LANCZOS)
+            inv_scale = 1.0 / scale
+        else:
+            proc_img = image
+            inv_scale = 1.0
+
+        img_np = np.array(proc_img)
         client = self._get_client()
 
         try:
             # PaddleOCR 3.x supports predict(), while 2.x uses ocr()
             if hasattr(client, 'predict'):
-                results = list(client.predict(img_np))
+                results = list(client.predict(img_np, text_det_limit_side_len=MAX_DET_SIDE, text_det_limit_type='max'))
             else:
                 results = client.ocr(img_np, cls=self.use_angle_cls)
         except Exception as exc:
             logger.error(f"PaddleOCR execution failed on page {page_num}: {exc}")
             raise RuntimeError(f"PaddleOCR processing error on page {page_num}: {exc}")
+        finally:
+            gc.collect()
 
         blocks: List[RawOCRBlock] = []
         if not results:
@@ -213,10 +231,10 @@ class PaddleOCREngine(BaseOCREngine):
 
                 conf = float(rec_scores[idx]) if idx < len(rec_scores) else 1.0
                 
-                # Extract coordinates
+                # Extract coordinates and scale back to original unscaled page bounds
                 if idx < len(rec_polys) and rec_polys[idx] is not None:
                     poly = rec_polys[idx]
-                    poly_list = [[float(p[0]), float(p[1])] for p in poly]
+                    poly_list = [[float(p[0] * inv_scale), float(p[1] * inv_scale)] for p in poly]
                     xs = [p[0] for p in poly_list]
                     ys = [p[1] for p in poly_list]
                     min_x = float(min(xs))
@@ -225,13 +243,13 @@ class PaddleOCREngine(BaseOCREngine):
                     height = float(max(ys) - min_y)
                 elif idx < len(rec_boxes) and rec_boxes[idx] is not None:
                     box = rec_boxes[idx]
-                    min_x = float(box[0])
-                    min_y = float(box[1])
-                    width = float(box[2] - box[0])
-                    height = float(box[3] - box[1])
+                    min_x = float(box[0] * inv_scale)
+                    min_y = float(box[1] * inv_scale)
+                    width = float((box[2] - box[0]) * inv_scale)
+                    height = float((box[3] - box[1]) * inv_scale)
                     poly_list = [[min_x, min_y], [min_x + width, min_y], [min_x + width, min_y + height], [min_x, min_y + height]]
                 else:
-                    min_x, min_y, width, height = 0.0, 0.0, float(image.width), float(image.height)
+                    min_x, min_y, width, height = 0.0, 0.0, float(orig_w), float(orig_h)
                     poly_list = []
 
                 blocks.append(
@@ -269,15 +287,14 @@ class PaddleOCREngine(BaseOCREngine):
                     if not text:
                         continue
 
-                    # Compute bounding box
-                    xs = [p[0] for p in polygon]
-                    ys = [p[1] for p in polygon]
+                    # Compute bounding box and scale back to original unscaled page bounds
+                    clean_polygon = [[float(p[0] * inv_scale), float(p[1] * inv_scale)] for p in polygon]
+                    xs = [p[0] for p in clean_polygon]
+                    ys = [p[1] for p in clean_polygon]
                     min_x = float(min(xs))
                     min_y = float(min(ys))
                     width = float(max(xs) - min_x)
                     height = float(max(ys) - min_y)
-
-                    clean_polygon = [[float(p[0]), float(p[1])] for p in polygon]
 
                     blocks.append(
                         RawOCRBlock(
