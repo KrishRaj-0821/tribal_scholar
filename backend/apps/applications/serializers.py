@@ -20,7 +20,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'revision_number', 'last_modified_at', 'last_modified_by', 'last_modified_by_username',
             'submission_data_json', 'is_synthetic', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'revision_number', 'last_modified_at', 'last_modified_by', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'application_number', 'applicant', 'current_state',
+            'revision_number', 'last_modified_at', 'last_modified_by',
+            'created_at', 'updated_at'
+        ]
 
 
 class EligibilityEvaluationSerializer(serializers.ModelSerializer):
