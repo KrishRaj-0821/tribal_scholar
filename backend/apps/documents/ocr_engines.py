@@ -148,7 +148,6 @@ class PaddleOCREngine(BaseOCREngine):
                         lang=self.lang,
                         device='cpu',
                         enable_mkldnn=False,
-                        use_angle_cls=False,
                         use_doc_orientation_classify=False,
                         use_doc_unwarping=False,
                         use_textline_orientation=False,
@@ -158,7 +157,6 @@ class PaddleOCREngine(BaseOCREngine):
                         client = PaddleOCR(
                             lang=self.lang,
                             enable_mkldnn=False,
-                            use_angle_cls=False,
                             use_doc_orientation_classify=False,
                             use_doc_unwarping=False,
                             use_textline_orientation=False,
