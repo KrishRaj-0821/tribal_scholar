@@ -221,14 +221,14 @@ def ocr_infra_env(db):
     }
 
 
-def spawn_celery_worker(worker_name: str = "ocr_worker", queue: str = "celery"):
+def spawn_celery_worker(worker_name: str = "ocr_worker", queue: str = "celery", engine_backend: str = "paddleocr"):
     """Spawns an isolated Celery worker subprocess targeting the active test database."""
     import urllib.parse
     worker_env = os.environ.copy()
     active_db = connection.settings_dict["NAME"]
     worker_env["POSTGRES_DB"] = active_db
     worker_env["TEST_LEVEL"] = "integration"
-    worker_env["OCR_ENGINE_BACKEND"] = "paddleocr"
+    worker_env["OCR_ENGINE_BACKEND"] = engine_backend
     if "DATABASE_URL" in worker_env:
         parsed = urllib.parse.urlparse(worker_env["DATABASE_URL"])
         worker_env["DATABASE_URL"] = urllib.parse.urlunparse(parsed._replace(path=f"/{active_db}"))
@@ -423,9 +423,9 @@ def test_d_two_workers_same_ocr_job_race_condition(ocr_infra_env, redis_client):
     run_ocr_task.apply_async(args=[str(ocr_job.id)], kwargs={"correlation_id": "RACE-1"}, queue=test_queue)
     run_ocr_task.apply_async(args=[str(ocr_job.id)], kwargs={"correlation_id": "RACE-2"}, queue=test_queue)
 
-    # Start 2 distinct Celery workers concurrently on test queue
-    w1 = spawn_celery_worker("worker_race_1", queue=test_queue)
-    w2 = spawn_celery_worker("worker_race_2", queue=test_queue)
+    # Start 2 distinct Celery workers concurrently on test queue (use mock engine to avoid OOM in container)
+    w1 = spawn_celery_worker("worker_race_1", queue=test_queue, engine_backend="mock")
+    w2 = spawn_celery_worker("worker_race_2", queue=test_queue, engine_backend="mock")
 
     try:
         max_wait = 150
