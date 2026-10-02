@@ -146,13 +146,10 @@ def redis_client():
 
 @pytest.fixture
 def ocr_infra_env(db):
-    User.objects.filter(username="ocr_integration_applicant").delete()
-    Scheme.objects.filter(code="OCR_INTEGRATION_SCHEME").delete()
-    SourceDocument.objects.filter(checksum="9" * 64).delete()
-
+    rand_id = uuid.uuid4().hex[:8]
     user = User.objects.create_user(
-        username="ocr_integration_applicant",
-        email="ocr_applicant@tribal.gov.in",
+        username=f"ocr_app_{rand_id}",
+        email=f"ocr_{rand_id}@tribal.gov.in",
         password="ValidPassword123!",
         role=UserRole.APPLICANT
     )
@@ -164,17 +161,17 @@ def ocr_infra_env(db):
     )
 
     src_doc = SourceDocument.objects.create(
-        title="OCR Integration Scheme Guideline",
+        title=f"OCR Guideline {rand_id}",
         source_type=SourceType.GUIDELINE,
         academic_year="2025-26",
-        checksum="9" * 64,
-        content_hash="8" * 64,
+        checksum=f"{rand_id}" + "9" * 56,
+        content_hash=f"{rand_id}" + "8" * 56,
         status=SourceDocumentStatus.VERIFIED
     )
 
     scheme = Scheme.objects.create(
-        code="OCR_INTEGRATION_SCHEME",
-        name="OCR Integration Scheme",
+        code=f"SCHEME_{rand_id.upper()}",
+        name=f"OCR Scheme {rand_id}",
         scheme_type=SchemeType.SCHOLARSHIP
     )
 
