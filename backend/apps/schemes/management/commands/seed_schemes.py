@@ -1203,9 +1203,9 @@ class Command(BaseCommand):
                 "required": True,
                 "section": "ELIGIBILITY",
                 "display_order": 1,
-                "validation_schema": {"max": 800000, "min": 0},
+                "validation_schema": {"max": 600000, "min": 0},
                 "source_document": doc_nos_2026,
-                "source_excerpt": "Family income ceiling enhanced to Rs. 8,00,000/- per annum.",
+                "source_excerpt": "Total family income from all sources should not exceed Rs. 6,00,000 per annum.",
                 "status": "ACTIVE"
             }
         )
@@ -1223,6 +1223,58 @@ class Command(BaseCommand):
                 "source_document": doc_nos_2026,
                 "source_excerpt": "For pursuing Masters, Ph.D. in foreign universities.",
                 "status": "ACTIVE"
+            }
+        )
+
+        # Seed synthetic testing personas for production verification and RBAC audits
+        from apps.accounts.models import User, UserRole
+        from apps.applicants.models import ApplicantProfile, CommunityCategory
+
+        admin_user, _ = User.objects.get_or_create(
+            username="synthetic_admin",
+            defaults={
+                "email": "synth_admin@tribal.gov.in",
+                "role": UserRole.ADMIN,
+                "is_staff": True,
+                "is_superuser": True
+            }
+        )
+        admin_user.set_password("SyntheticSecurePass2026!")
+        admin_user.role = UserRole.ADMIN
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.save()
+
+        officer_user, _ = User.objects.get_or_create(
+            username="synthetic_officer",
+            defaults={
+                "email": "synth_officer@tribal.gov.in",
+                "role": UserRole.SCRUTINY_OFFICER,
+                "is_staff": True
+            }
+        )
+        officer_user.set_password("SyntheticSecurePass2026!")
+        officer_user.role = UserRole.SCRUTINY_OFFICER
+        officer_user.is_staff = True
+        officer_user.save()
+
+        app_user, _ = User.objects.get_or_create(
+            username="synthetic_applicant",
+            defaults={
+                "email": "synth_applicant@tribal.gov.in",
+                "role": UserRole.APPLICANT
+            }
+        )
+        app_user.set_password("SyntheticSecurePass2026!")
+        app_user.role = UserRole.APPLICANT
+        app_user.save()
+
+        ApplicantProfile.objects.get_or_create(
+            user=app_user,
+            defaults={
+                "community": CommunityCategory.ST,
+                "annual_family_income": 350000,
+                "is_synthetic": True
             }
         )
 

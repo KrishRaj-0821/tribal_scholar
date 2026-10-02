@@ -72,6 +72,7 @@ urlpatterns = [
     path('api/v1/documents/<str:document_id>/trigger-ocr/', DocumentTriggerOCRView.as_view(), name='document-trigger-ocr-str'),
     path('api/v1/documents/<uuid:document_id>/', DocumentDetailView.as_view(), name='document-detail'),
     path('api/v1/documents/<str:document_id>/', DocumentDetailView.as_view(), name='document-detail-str'),
+    path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/verification/', include('apps.verification.urls')),
     path('api/v1/', include(router.urls)),
     path('api/v1/integrations/status/', IntegrationStatusView.as_view(), name='integration-status'),
