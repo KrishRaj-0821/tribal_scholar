@@ -182,12 +182,12 @@ class FieldValueSource(models.TextChoices):
     APPLICANT_DECLARED = 'APPLICANT_DECLARED', 'Applicant Declared'
     OCR_PROVISIONAL = 'OCR_PROVISIONAL', 'OCR Extraction (Provisional)'
 
-    # Canonical aliases mapping legacy / alternate names
-    OFFICER = 'OFFICER_VERIFIED'
-    DIGILOCKER = 'OFFICIAL_INTEGRATION'
-    OCR_VERIFIED = 'VERIFIED_DOCUMENT'
-    APPLICANT = 'APPLICANT_DECLARED'
-    OCR = 'OCR_PROVISIONAL'
+# Canonical aliases mapping legacy / alternate names
+FieldValueSource.OFFICER = FieldValueSource.OFFICER_VERIFIED
+FieldValueSource.DIGILOCKER = FieldValueSource.OFFICIAL_INTEGRATION
+FieldValueSource.OCR_VERIFIED = FieldValueSource.VERIFIED_DOCUMENT
+FieldValueSource.APPLICANT = FieldValueSource.APPLICANT_DECLARED
+FieldValueSource.OCR = FieldValueSource.OCR_PROVISIONAL
 
 SOURCE_TRUST_RANK = {
     FieldValueSource.OFFICER_VERIFIED: 60,
