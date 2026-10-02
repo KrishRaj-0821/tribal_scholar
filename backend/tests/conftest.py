@@ -98,6 +98,8 @@ def check_redis_availability_for_integration(request):
     """
     node_path = str(request.node.fspath).replace("\\", "/")
     if "tests/integration" in node_path or request.node.get_closest_marker("requires_redis"):
+        import redis
+        from django.conf import settings
         redis_url = getattr(settings, 'REDIS_URL', None)
         if redis_url:
             r = redis.from_url(redis_url, socket_timeout=2)
