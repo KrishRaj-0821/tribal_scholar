@@ -75,9 +75,11 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         # Resolve initial workflow state
         current_state = serializer.validated_data.get('current_state')
         if not current_state:
-            initial_state = WorkflowState.objects.filter(is_initial=True).first()
-            if not initial_state:
-                initial_state = WorkflowState.objects.first()
+            workflow = getattr(scheme_version, 'workflow', None) if scheme_version else None
+            if workflow:
+                initial_state = workflow.states.filter(code='DRAFT').first() or workflow.states.order_by('sequence').first()
+            else:
+                initial_state = WorkflowState.objects.filter(code='DRAFT').first() or WorkflowState.objects.order_by('sequence').first()
             current_state = initial_state
 
         instance = serializer.save(
