@@ -1,7 +1,15 @@
+import os
 import hashlib
 import json
 import logging
 import threading
+
+# Explicitly disable PIR with OneDNN regression on CPU
+os.environ.setdefault('FLAGS_enable_pir_api', '0')
+os.environ.setdefault('FLAGS_use_mkldnn', '0')
+os.environ.setdefault('PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT', '0')
+os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict, Any
@@ -114,12 +122,18 @@ class PaddleOCREngine(BaseOCREngine):
                 return PaddleOCREngine._paddle_ocr_clients[self.lang]
 
             try:
+                os.environ['FLAGS_enable_pir_api'] = '0'
+                os.environ['FLAGS_use_mkldnn'] = '0'
+                os.environ['PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT'] = '0'
                 from paddleocr import PaddleOCR
-                # PaddleOCR 3.x / 2.x compatibility: try standard kwargs first
+                # PaddleOCR initialization: force enable_mkldnn=False to prevent PIR oneDNN crashes
                 try:
-                    client = PaddleOCR(lang=self.lang)
+                    client = PaddleOCR(lang=self.lang, enable_mkldnn=False, use_angle_cls=self.use_angle_cls)
                 except TypeError:
-                    client = PaddleOCR(lang=self.lang, enable_mkldnn=False)
+                    try:
+                        client = PaddleOCR(lang=self.lang, enable_mkldnn=False)
+                    except TypeError:
+                        client = PaddleOCR(lang=self.lang)
 
                 PaddleOCREngine._paddle_ocr_clients[self.lang] = client
                 return client

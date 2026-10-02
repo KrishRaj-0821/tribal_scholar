@@ -3,6 +3,12 @@ set -e
 
 echo "=== [Railway Deploy] Starting Tribal Scholar Celery Worker ==="
 
+export FLAGS_enable_pir_api=0
+export FLAGS_use_mkldnn=0
+export PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=0
+export KMP_DUPLICATE_LIB_OK=TRUE
+export OMP_NUM_THREADS=2
+
 # Wait for database & redis
 python - << 'EOF'
 import sys, time, os, django

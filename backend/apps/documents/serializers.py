@@ -72,7 +72,7 @@ class OCRJobStatusSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'document_id', 'status', 'attempts', 'created_at',
             'started_at', 'completed_at', 'failure_code', 'failure_message',
-            'engine_name', 'pipeline_version'
+            'engine_name', 'pipeline_version', 'task_id', 'worker_id'
         ]
         read_only_fields = fields
 
