@@ -6,6 +6,7 @@ echo "=== [Railway Deploy] Starting Tribal Scholar Celery Worker ==="
 export FLAGS_enable_pir_api=0
 export FLAGS_use_mkldnn=0
 export PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=0
+export FLAGS_allocator_strategy=naive_best_fit
 export KMP_DUPLICATE_LIB_OK=TRUE
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1

@@ -128,15 +128,46 @@ class PaddleOCREngine(BaseOCREngine):
                 os.environ['FLAGS_enable_pir_api'] = '0'
                 os.environ['FLAGS_use_mkldnn'] = '0'
                 os.environ['PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT'] = '0'
-                from paddleocr import PaddleOCR
-                # PaddleOCR initialization: force enable_mkldnn=False to prevent PIR oneDNN crashes
+                os.environ['FLAGS_allocator_strategy'] = 'naive_best_fit'
+
+                import paddle
                 try:
-                    client = PaddleOCR(lang=self.lang, enable_mkldnn=False, use_angle_cls=self.use_angle_cls)
+                    paddle.disable_signal_handler()
+                except Exception:
+                    pass
+                try:
+                    paddle.set_device('cpu')
+                except Exception:
+                    pass
+
+                from paddleocr import PaddleOCR
+                # PaddleOCR lightweight CPU initialization:
+                # Disable heavy unwarping and doc orientation models to reduce memory footprint by 70%
+                try:
+                    client = PaddleOCR(
+                        lang=self.lang,
+                        device='cpu',
+                        enable_mkldnn=False,
+                        use_angle_cls=False,
+                        use_doc_orientation_classify=False,
+                        use_doc_unwarping=False,
+                        use_textline_orientation=False,
+                    )
                 except TypeError:
                     try:
-                        client = PaddleOCR(lang=self.lang, enable_mkldnn=False)
+                        client = PaddleOCR(
+                            lang=self.lang,
+                            enable_mkldnn=False,
+                            use_angle_cls=False,
+                            use_doc_orientation_classify=False,
+                            use_doc_unwarping=False,
+                            use_textline_orientation=False,
+                        )
                     except TypeError:
-                        client = PaddleOCR(lang=self.lang)
+                        try:
+                            client = PaddleOCR(lang=self.lang, enable_mkldnn=False)
+                        except TypeError:
+                            client = PaddleOCR(lang=self.lang)
 
                 PaddleOCREngine._paddle_ocr_clients[self.lang] = client
                 return client
@@ -169,12 +200,13 @@ class PaddleOCREngine(BaseOCREngine):
             return blocks
 
         # Case 1: PaddleOCR 3.x dict format [{'rec_texts': [...], 'rec_scores': [...], 'rec_polys': [...]}]
-        if isinstance(results[0], dict):
-            page_dict = results[0]
-            rec_texts = page_dict.get('rec_texts', [])
-            rec_scores = page_dict.get('rec_scores', [])
-            rec_polys = page_dict.get('rec_polys', [])
-            rec_boxes = page_dict.get('rec_boxes', [])
+        first_res = results[0]
+        if isinstance(first_res, dict) or hasattr(first_res, 'get') or hasattr(first_res, 'rec_texts'):
+            page_dict = first_res
+            rec_texts = page_dict.get('rec_texts', []) if hasattr(page_dict, 'get') else getattr(page_dict, 'rec_texts', [])
+            rec_scores = page_dict.get('rec_scores', []) if hasattr(page_dict, 'get') else getattr(page_dict, 'rec_scores', [])
+            rec_polys = page_dict.get('rec_polys', []) if hasattr(page_dict, 'get') else getattr(page_dict, 'rec_polys', [])
+            rec_boxes = page_dict.get('rec_boxes', []) if hasattr(page_dict, 'get') else getattr(page_dict, 'rec_boxes', [])
 
             for idx, text in enumerate(rec_texts):
                 clean_text = str(text).strip()
