@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict, Any
@@ -101,20 +102,30 @@ class PaddleOCREngine(BaseOCREngine):
         return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
     _paddle_ocr_clients: Dict[str, Any] = {}
+    _client_lock = threading.Lock()
 
     def _get_client(self):
-        if self.lang not in PaddleOCREngine._paddle_ocr_clients:
+        if self.lang in PaddleOCREngine._paddle_ocr_clients:
+            return PaddleOCREngine._paddle_ocr_clients[self.lang]
+
+        with PaddleOCREngine._client_lock:
+            # Double-checked locking across worker threads
+            if self.lang in PaddleOCREngine._paddle_ocr_clients:
+                return PaddleOCREngine._paddle_ocr_clients[self.lang]
+
             try:
                 from paddleocr import PaddleOCR
-                # Initialize PaddleOCR with enable_mkldnn=False to ensure stable inference on Windows
-                PaddleOCREngine._paddle_ocr_clients[self.lang] = PaddleOCR(
-                    lang=self.lang,
-                    enable_mkldnn=False,
-                )
+                # PaddleOCR 3.x / 2.x compatibility: try standard kwargs first
+                try:
+                    client = PaddleOCR(lang=self.lang)
+                except TypeError:
+                    client = PaddleOCR(lang=self.lang, enable_mkldnn=False)
+
+                PaddleOCREngine._paddle_ocr_clients[self.lang] = client
+                return client
             except Exception as exc:
                 logger.error(f"Failed to initialize PaddleOCR client for lang '{self.lang}': {exc}")
                 raise RuntimeError(f"PaddleOCR client initialization failed for lang '{self.lang}': {exc}")
-        return PaddleOCREngine._paddle_ocr_clients[self.lang]
 
     def process_image(self, image: Image.Image, page_num: int = 1) -> List[RawOCRBlock]:
         import numpy as np

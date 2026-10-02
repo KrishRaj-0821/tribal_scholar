@@ -50,5 +50,5 @@ for _ in range(10):
 CLAM_EOF
 fi
 
-echo "==> Starting Celery worker process (concurrency: 2)..."
-exec celery -A tribel_scholar worker --loglevel=info --concurrency=2
+echo "==> Starting Celery worker process (concurrency: 2, pool: threads)..."
+exec celery -A tribel_scholar worker --loglevel=info --concurrency=2 --pool=threads

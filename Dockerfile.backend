@@ -2,14 +2,19 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV KMP_DUPLICATE_LIB_OK=TRUE
+ENV OMP_NUM_THREADS=2
 
 WORKDIR /app
 
-# Install system dependencies including libpq for PostgreSQL, curl, and ClamAV daemon
+# Install system dependencies including libpq for PostgreSQL, curl, OpenCV/PaddleOCR dependencies, and ClamAV daemon
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
     clamav \
     clamav-daemon \
     clamav-freshclam \
