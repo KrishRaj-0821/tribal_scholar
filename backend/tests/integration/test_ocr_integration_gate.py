@@ -43,7 +43,11 @@ pytestmark = [
 
 
 def make_devanagari_raster_png() -> bytes:
-    """Generates synthetic raster PNG containing real Devanagari script."""
+    """Generates or loads synthetic raster PNG containing real Devanagari script."""
+    fixture_path = os.path.join(os.path.dirname(__file__), "..", "fixtures", "devanagari_cert.png")
+    if os.path.exists(fixture_path):
+        with open(fixture_path, "rb") as f:
+            return f.read()
     img = Image.new("RGB", (650, 400), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     font_path = "C:/Windows/Fonts/Nirmala.ttc"
@@ -63,7 +67,11 @@ def make_devanagari_raster_png() -> bytes:
 
 
 def make_mixed_raster_png() -> bytes:
-    """Generates synthetic raster PNG containing mixed English and Devanagari script."""
+    """Generates or loads synthetic raster PNG containing mixed English and Devanagari script."""
+    fixture_path = os.path.join(os.path.dirname(__file__), "..", "fixtures", "mixed_cert.png")
+    if os.path.exists(fixture_path):
+        with open(fixture_path, "rb") as f:
+            return f.read()
     img = Image.new("RGB", (650, 400), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     font_path = "C:/Windows/Fonts/Nirmala.ttc"
@@ -215,10 +223,15 @@ def ocr_infra_env(db):
 
 def spawn_celery_worker(worker_name: str = "ocr_worker", queue: str = "celery"):
     """Spawns an isolated Celery worker subprocess targeting the active test database."""
+    import urllib.parse
     worker_env = os.environ.copy()
-    worker_env["POSTGRES_DB"] = connection.settings_dict["NAME"]
+    active_db = connection.settings_dict["NAME"]
+    worker_env["POSTGRES_DB"] = active_db
     worker_env["TEST_LEVEL"] = "integration"
     worker_env["OCR_ENGINE_BACKEND"] = "paddleocr"
+    if "DATABASE_URL" in worker_env:
+        parsed = urllib.parse.urlparse(worker_env["DATABASE_URL"])
+        worker_env["DATABASE_URL"] = urllib.parse.urlunparse(parsed._replace(path=f"/{active_db}"))
 
     proc = subprocess.Popen([
         sys.executable, "-m", "celery", "-A", "tribel_scholar",
