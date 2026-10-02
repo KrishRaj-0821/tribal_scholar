@@ -216,7 +216,7 @@ def ocr_infra_env(db):
     }
 
 
-def spawn_celery_worker(worker_name: str = "ocr_worker"):
+def spawn_celery_worker(worker_name: str = "ocr_worker", queue: str = "celery"):
     """Spawns an isolated Celery worker subprocess targeting the active test database."""
     worker_env = os.environ.copy()
     worker_env["POSTGRES_DB"] = connection.settings_dict["NAME"]
@@ -225,7 +225,8 @@ def spawn_celery_worker(worker_name: str = "ocr_worker"):
 
     proc = subprocess.Popen([
         sys.executable, "-m", "celery", "-A", "tribel_scholar",
-        "worker", "--pool=solo", "-l", "WARNING", "-n", f"{worker_name}_{uuid.uuid4().hex[:6]}@localhost"
+        "worker", "--pool=solo", "-l", "WARNING", "-n", f"{worker_name}_{uuid.uuid4().hex[:6]}@localhost",
+        "-Q", queue
     ], env=worker_env)
     return proc
 
@@ -238,7 +239,8 @@ def test_a_safe_document_ocr_via_real_celery_worker(ocr_infra_env, redis_client)
     Test A: Upload -> security pipeline -> SAFE -> OCR task -> Redis -> real worker -> OCR result.
     Proves real async execution over Redis and PostgreSQL.
     """
-    redis_client.delete("celery")
+    test_queue = f"test_a_{uuid.uuid4().hex[:6]}"
+    redis_client.delete(test_queue)
     app = ocr_infra_env["app"]
     user = ocr_infra_env["user"]
     pdf_bytes = make_clean_pdf("Annual Family Income Rs. 450000 Certificate No. INC-2025-9988")
@@ -257,12 +259,12 @@ def test_a_safe_document_ocr_via_real_celery_worker(ocr_infra_env, redis_client)
     ocr_job = OCRService.create_or_get_ocr_job(doc.id)
     assert ocr_job.status == OCRJobStatus.PENDING
 
-    # Dispatch to Redis
-    run_ocr_task.delay(str(ocr_job.id), correlation_id="CORR-TEST-A")
-    assert redis_client.llen("celery") >= 1, "OCR task was not placed in Redis queue."
+    # Dispatch to Redis on isolated queue
+    run_ocr_task.apply_async(args=[str(ocr_job.id)], kwargs={"correlation_id": "CORR-TEST-A"}, queue=test_queue)
+    assert redis_client.llen(test_queue) >= 1, "OCR task was not placed in Redis queue."
 
     # Launch live Celery worker subprocess to consume from Redis
-    worker_p = spawn_celery_worker("worker_a")
+    worker_p = spawn_celery_worker("worker_a", queue=test_queue)
     try:
         max_wait = 150
         start = time.time()
@@ -298,7 +300,7 @@ def test_a_safe_document_ocr_via_real_celery_worker(ocr_infra_env, redis_client)
     finally:
         worker_p.terminate()
         worker_p.wait()
-        redis_client.delete("celery")
+        redis_client.delete(test_queue)
 
 
 # ==============================================================================
@@ -391,7 +393,8 @@ def test_d_two_workers_same_ocr_job_race_condition(ocr_infra_env, redis_client):
     Expected: Exactly one worker processes and creates result; second safely observes COMPLETED.
     No duplicate OCRResult, no corrupted state.
     """
-    redis_client.delete("celery")
+    test_queue = f"test_d_{uuid.uuid4().hex[:6]}"
+    redis_client.delete(test_queue)
     app = ocr_infra_env["app"]
     user = ocr_infra_env["user"]
     pdf_bytes = make_clean_pdf("Two Worker Test Income Rs. 450000")
@@ -406,13 +409,13 @@ def test_d_two_workers_same_ocr_job_race_condition(ocr_infra_env, redis_client):
 
     ocr_job = OCRService.create_or_get_ocr_job(doc.id)
 
-    # Push task twice to Redis to simulate duplicate queue delivery
-    run_ocr_task.delay(str(ocr_job.id), correlation_id="RACE-1")
-    run_ocr_task.delay(str(ocr_job.id), correlation_id="RACE-2")
+    # Push task twice to Redis to simulate duplicate queue delivery on isolated test queue
+    run_ocr_task.apply_async(args=[str(ocr_job.id)], kwargs={"correlation_id": "RACE-1"}, queue=test_queue)
+    run_ocr_task.apply_async(args=[str(ocr_job.id)], kwargs={"correlation_id": "RACE-2"}, queue=test_queue)
 
-    # Start 2 distinct Celery workers concurrently
-    w1 = spawn_celery_worker("worker_race_1")
-    w2 = spawn_celery_worker("worker_race_2")
+    # Start 2 distinct Celery workers concurrently on test queue
+    w1 = spawn_celery_worker("worker_race_1", queue=test_queue)
+    w2 = spawn_celery_worker("worker_race_2", queue=test_queue)
 
     try:
         max_wait = 150
@@ -440,7 +443,7 @@ def test_d_two_workers_same_ocr_job_race_condition(ocr_infra_env, redis_client):
         w2.terminate()
         w1.wait()
         w2.wait()
-        redis_client.delete("celery")
+        redis_client.delete(test_queue)
 
 
 # ==============================================================================
