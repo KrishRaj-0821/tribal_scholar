@@ -175,20 +175,39 @@ class FieldValueVerificationStatus(models.TextChoices):
     OFFICIAL_VERIFIED = 'OFFICIAL_VERIFIED', 'Official Verified'
 
 class FieldValueSource(models.TextChoices):
-    OFFICER = 'OFFICER', 'Officer Verified'
+    OFFICER_VERIFIED = 'OFFICER_VERIFIED', 'Officer Verified'
     OFFICIAL_INTEGRATION = 'OFFICIAL_INTEGRATION', 'Official Integration (e.g. DigiLocker)'
     VERIFIED_DOCUMENT = 'VERIFIED_DOCUMENT', 'Verified Document Extraction'
-    APPLICANT = 'APPLICANT', 'Applicant Declared'
-    OCR = 'OCR', 'OCR Extraction (Provisional)'
     SYSTEM = 'SYSTEM', 'System Calculated'
+    APPLICANT_DECLARED = 'APPLICANT_DECLARED', 'Applicant Declared'
+    OCR_PROVISIONAL = 'OCR_PROVISIONAL', 'OCR Extraction (Provisional)'
+
+    # Canonical aliases mapping legacy / alternate names
+    OFFICER = 'OFFICER_VERIFIED'
+    DIGILOCKER = 'OFFICIAL_INTEGRATION'
+    OCR_VERIFIED = 'VERIFIED_DOCUMENT'
+    APPLICANT = 'APPLICANT_DECLARED'
+    OCR = 'OCR_PROVISIONAL'
 
 SOURCE_TRUST_RANK = {
-    FieldValueSource.OFFICER: 50,
-    FieldValueSource.OFFICIAL_INTEGRATION: 40,
-    FieldValueSource.VERIFIED_DOCUMENT: 30,
-    FieldValueSource.SYSTEM: 25,
-    FieldValueSource.APPLICANT: 20,
-    FieldValueSource.OCR: 10,
+    FieldValueSource.OFFICER_VERIFIED: 60,
+    FieldValueSource.OFFICIAL_INTEGRATION: 50,
+    FieldValueSource.VERIFIED_DOCUMENT: 40,
+    FieldValueSource.SYSTEM: 30,
+    FieldValueSource.APPLICANT_DECLARED: 20,
+    FieldValueSource.OCR_PROVISIONAL: 10,
+    # String aliases for database rows and string lookups
+    'OFFICER_VERIFIED': 60,
+    'OFFICER': 60,
+    'OFFICIAL_INTEGRATION': 50,
+    'DIGILOCKER': 50,
+    'VERIFIED_DOCUMENT': 40,
+    'OCR_VERIFIED': 40,
+    'SYSTEM': 30,
+    'APPLICANT_DECLARED': 20,
+    'APPLICANT': 20,
+    'OCR_PROVISIONAL': 10,
+    'OCR': 10,
 }
 
 class ApplicationFieldDefinition(models.Model):
@@ -288,17 +307,46 @@ class ApplicationFieldValue(models.Model):
 
     @property
     def trust_rank(self) -> int:
-        return SOURCE_TRUST_RANK.get(self.source, 0)
+        canon_map = {
+            'OFFICER_VERIFIED': 60,
+            'OFFICER': 60,
+            'OFFICIAL_INTEGRATION': 50,
+            'DIGILOCKER': 50,
+            'VERIFIED_DOCUMENT': 40,
+            'OCR_VERIFIED': 40,
+            'SYSTEM': 30,
+            'APPLICANT_DECLARED': 20,
+            'APPLICANT': 20,
+            'OCR_PROVISIONAL': 10,
+            'OCR': 10,
+        }
+        return canon_map.get(str(self.source).upper(), SOURCE_TRUST_RANK.get(self.source, 0))
 
     def save(self, *args, **kwargs):
+        canon_src = {
+            'OFFICER': FieldValueSource.OFFICER_VERIFIED,
+            'OFFICER_VERIFIED': FieldValueSource.OFFICER_VERIFIED,
+            'OFFICIAL_INTEGRATION': FieldValueSource.OFFICIAL_INTEGRATION,
+            'DIGILOCKER': FieldValueSource.OFFICIAL_INTEGRATION,
+            'VERIFIED_DOCUMENT': FieldValueSource.VERIFIED_DOCUMENT,
+            'OCR_VERIFIED': FieldValueSource.VERIFIED_DOCUMENT,
+            'SYSTEM': FieldValueSource.SYSTEM,
+            'APPLICANT': FieldValueSource.APPLICANT_DECLARED,
+            'APPLICANT_DECLARED': FieldValueSource.APPLICANT_DECLARED,
+            'OCR': FieldValueSource.OCR_PROVISIONAL,
+            'OCR_PROVISIONAL': FieldValueSource.OCR_PROVISIONAL,
+        }
+        if self.source in canon_src:
+            self.source = canon_src[self.source]
+
         if not self.pk and self.verification_status == FieldValueVerificationStatus.UNVERIFIED:
-            if self.source == FieldValueSource.OCR:
+            if self.source in (FieldValueSource.OCR_PROVISIONAL, 'OCR'):
                 self.verification_status = FieldValueVerificationStatus.PROVISIONALLY_EXTRACTED
-            elif self.source == FieldValueSource.VERIFIED_DOCUMENT:
+            elif self.source in (FieldValueSource.VERIFIED_DOCUMENT, 'OCR_VERIFIED'):
                 self.verification_status = FieldValueVerificationStatus.DOCUMENT_VERIFIED
-            elif self.source == FieldValueSource.OFFICER:
+            elif self.source in (FieldValueSource.OFFICER_VERIFIED, 'OFFICER'):
                 self.verification_status = FieldValueVerificationStatus.OFFICER_VERIFIED
-            elif self.source == FieldValueSource.OFFICIAL_INTEGRATION:
+            elif self.source in (FieldValueSource.OFFICIAL_INTEGRATION, 'DIGILOCKER'):
                 self.verification_status = FieldValueVerificationStatus.OFFICIAL_VERIFIED
         super().save(*args, **kwargs)
 

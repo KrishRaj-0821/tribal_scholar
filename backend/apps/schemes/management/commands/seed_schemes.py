@@ -874,9 +874,9 @@ class Command(BaseCommand):
                 RuleCategory.ELIGIBILITY,
                 "applicant.annual_family_income",
                 RuleOperator.LESS_THAN_OR_EQUAL,
-                800000,
-                "Total family income from all sources must not exceed Rs 8,00,000 per annum.",
-                "Family income ceiling enhanced to Rs. 8,00,000/- per annum.",
+                600000,
+                "Total family income from all sources must not exceed Rs. 6,00,000 per annum.",
+                "Total family income from all sources should not exceed Rs. 6,00,000 per annum.",
                 RuleSeverity.BLOCKING
             ),
             (
@@ -927,7 +927,7 @@ class Command(BaseCommand):
         SchemeRule.objects.filter(scheme_version=version_nos_2026, rule_code="NOS_2026_AMENDED_COURSE_ELIGIBILITY").delete()
 
         for r_code, cat, f_path, op, val, msg, excerpt, sev in nos_rules_2026:
-            prov_stat = ProvenanceStatus.OFFICIAL_PENDING_VERIFICATION if r_code == "NOS_2026_INCOME_CEILING" else ProvenanceStatus.OFFICIAL_VERIFIED
+            prov_stat = ProvenanceStatus.OFFICIAL_VERIFIED
             SchemeRule.objects.update_or_create(
                 scheme_version=version_nos_2026,
                 rule_code=r_code,
@@ -939,7 +939,7 @@ class Command(BaseCommand):
                     "failure_message": msg,
                     "source_excerpt": excerpt,
                     "severity": sev,
-                    "requires_human_review": (prov_stat == ProvenanceStatus.OFFICIAL_PENDING_VERIFICATION),
+                    "requires_human_review": False,
                     "source_document": doc_nos_2026,
                     "status": RuleStatus.ACTIVE,
                     "provenance_status": prov_stat

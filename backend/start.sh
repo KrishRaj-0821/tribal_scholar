@@ -40,6 +40,12 @@ python manage.py validate_schemes || echo "WARN: validate_schemes encountered a 
 echo "==> Collecting static assets..."
 python manage.py collectstatic --noinput
 
+# 4.5. Start ClamAV daemon if available
+if command -v clamd >/dev/null 2>&1; then
+    echo "==> Starting ClamAV daemon on 127.0.0.1:3310..."
+    clamd || echo "WARN: clamd failed to start."
+fi
+
 # 5. Start Gunicorn production WSGI server
 echo "==> Starting Gunicorn on port ${PORT:-8000}..."
 exec gunicorn tribel_scholar.wsgi:application \

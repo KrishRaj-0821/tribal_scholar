@@ -29,5 +29,26 @@ print("ERROR: Worker dependencies timed out.")
 sys.exit(1)
 EOF
 
+if command -v clamd >/dev/null 2>&1; then
+    echo "==> Starting ClamAV daemon on 127.0.0.1:3310..."
+    clamd || echo "WARN: clamd failed to start."
+    sleep 2
+    python - << 'CLAM_EOF'
+import socket, time
+for _ in range(10):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2.0)
+            s.connect(("127.0.0.1", 3310))
+            s.sendall(b"zPING\0")
+            resp = s.recv(1024).decode('utf-8', errors='replace').strip()
+            if "PONG" in resp:
+                print("ClamAV daemon verified and responsive on 127.0.0.1:3310!")
+                break
+    except Exception:
+        time.sleep(1)
+CLAM_EOF
+fi
+
 echo "==> Starting Celery worker process (concurrency: 2)..."
 exec celery -A tribel_scholar worker --loglevel=info --concurrency=2

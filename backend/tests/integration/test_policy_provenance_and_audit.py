@@ -96,10 +96,11 @@ def test_top_class_income_ceiling_distinct_from_nos_enhanced_ceiling(seeded_db):
     top_rule = SchemeRule.objects.get(scheme_version=top_version, rule_code="TOP_CLASS_2025_INCOME_CEILING")
     assert top_rule.value == 600000
 
-    # NOS 2026-27 has enhanced 8.00 lakh ceiling under a separate SchemeVersion
+    # NOS 2026-27 official MoTA verified income ceiling is 6.00 lakh (Rs. 600,000)
     nos_version_2026 = SchemeVersion.objects.get(scheme__code="NOS", academic_year="2026-27")
     nos_rule = SchemeRule.objects.get(scheme_version=nos_version_2026, rule_code="NOS_2026_INCOME_CEILING")
-    assert nos_rule.value == 800000
+    assert nos_rule.value == 600000
+    assert nos_rule.provenance_status == ProvenanceStatus.OFFICIAL_VERIFIED
 
 
 # =============================================================================
@@ -349,19 +350,18 @@ def test_nos_2025_evaluation_uses_only_2025_rules_and_nos_2026_uses_only_2026_ru
 @pytest.mark.django_db
 def test_nos_2026_27_unverified_income_produces_needs_review_not_automatic_eligibility(seeded_db):
     """
-    Verifies that the NOS 2026-27 ₹8 Lakh income rule is stored as
-    OFFICIAL_PENDING_VERIFICATION and:
-    1. Produces UNRESOLVED result during evaluation.
-    2. Yields overall status NEEDS_REVIEW.
-    3. Strictly forbids automatic ELIGIBLE grant.
+    Verifies that the NOS 2026-27 income rule is correctly set to the official
+    MoTA ceiling of Rs 6,00,000 with OFFICIAL_VERIFIED provenance.
+    Also verifies that if any rule is marked OFFICIAL_PENDING_VERIFICATION,
+    the rule engine yields NEEDS_REVIEW and forbids automatic ELIGIBLE grant.
     """
     nos_2026 = SchemeVersion.objects.get(scheme__code="NOS", academic_year="2026-27")
     inc_rule = nos_2026.rules.get(rule_code="NOS_2026_INCOME_CEILING")
-    assert inc_rule.value == 800000
-    assert inc_rule.provenance_status == ProvenanceStatus.OFFICIAL_PENDING_VERIFICATION
+    assert inc_rule.value == 600000
+    assert inc_rule.provenance_status == ProvenanceStatus.OFFICIAL_VERIFIED
 
     user = User.objects.create_user(username="nos_2026_applicant", email="nos26@tribal.gov.in", password="Password123!", role=UserRole.APPLICANT)
-    prof = ApplicantProfile.objects.create(user=user, community="ST", annual_family_income=700000)
+    prof = ApplicantProfile.objects.create(user=user, community="ST", annual_family_income=500000)
 
     app = Application.objects.create(
         applicant=prof,
@@ -376,15 +376,29 @@ def test_nos_2026_27_unverified_income_produces_needs_review_not_automatic_eligi
             },
             "applicant": {
                 "community": "ST",
-                "annual_family_income": 700000,
+                "annual_family_income": 500000,
                 "digilocker_verified": True
             }
         }
     )
 
+    # 1. With official verified ceiling, applicant with 500k is ELIGIBLE
     eval_result = RuleEvaluationService.evaluate(application=app)
-    assert eval_result["status"] == "NEEDS_REVIEW", "Unverified income ceiling must produce NEEDS_REVIEW, never ELIGIBLE!"
-    unresolved_codes = [u["rule_code"] for u in eval_result["unresolved_rules"]]
+    assert eval_result["status"] == "ELIGIBLE", f"Expected ELIGIBLE, got {eval_result['status']}"
+
+    # 2. If applicant has 700k (> 600k ceiling), evaluation fails
+    app.submission_data_json["applicant"]["annual_family_income"] = 700000
+    app.save()
+    eval_fail = RuleEvaluationService.evaluate(application=app)
+    assert eval_fail["status"] == "INELIGIBLE", "Applicant above 600,000 must be INELIGIBLE"
+
+    # 3. Provenance safety guard: if rule is set to OFFICIAL_PENDING_VERIFICATION, engine yields NEEDS_REVIEW
+    inc_rule.provenance_status = ProvenanceStatus.OFFICIAL_PENDING_VERIFICATION
+    inc_rule.requires_human_review = True
+    inc_rule.save()
+    eval_pending = RuleEvaluationService.evaluate(application=app)
+    assert eval_pending["status"] == "NEEDS_REVIEW", "Unverified income ceiling must produce NEEDS_REVIEW, never ELIGIBLE!"
+    unresolved_codes = [u["rule_code"] for u in eval_pending["unresolved_rules"]]
     assert "NOS_2026_INCOME_CEILING" in unresolved_codes
 
 

@@ -5,12 +5,25 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies including libpq for PostgreSQL
+# Install system dependencies including libpq for PostgreSQL, curl, and ClamAV daemon
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
+    clamav \
+    clamav-daemon \
+    clamav-freshclam \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure ClamAV daemon for TCP socket on 127.0.0.1:3310 with initial signature DB
+RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav && \
+    chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav && \
+    chmod 755 /var/run/clamav /var/lib/clamav /var/log/clamav && \
+    echo "TCPSocket 3310" >> /etc/clamav/clamd.conf && \
+    echo "TCPAddr 127.0.0.1" >> /etc/clamav/clamd.conf && \
+    echo "MaxThreads 4" >> /etc/clamav/clamd.conf && \
+    echo "Eicar-Test-Signature:0:*:45494341522d5354414e444152442d414e544956495255532d544553542d46494c45" > /var/lib/clamav/local.ndb && \
+    chown clamav:clamav /var/lib/clamav/local.ndb
 
 COPY backend/requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
