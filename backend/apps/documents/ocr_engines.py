@@ -143,8 +143,11 @@ class PaddleOCREngine(BaseOCREngine):
                 from paddleocr import PaddleOCR
                 # PaddleOCR lightweight CPU initialization:
                 # Disable heavy unwarping and doc orientation models to reduce memory footprint by 70%
+                # Use lightweight mobile PP-OCRv3 for non-English languages to avoid loading massive server detection models
+                ocr_version = 'PP-OCRv3' if self.lang != 'en' else None
                 client = PaddleOCR(
                     lang=self.lang,
+                    ocr_version=ocr_version,
                     device='cpu',
                     enable_mkldnn=False,
                     use_doc_orientation_classify=False,
