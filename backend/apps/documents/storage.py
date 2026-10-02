@@ -140,35 +140,114 @@ class LocalObjectStorage(ObjectStorage):
 
 class S3CompatibleObjectStorage(ObjectStorage):
     """
-    Production-ready S3 / MinIO storage adapter boundary.
-    Can be activated via STORAGE_BACKEND='s3' or STORAGE_BACKEND='minio'.
+    Production-ready S3 / MinIO / Cloudflare R2 storage adapter boundary.
+    Activated via STORAGE_BACKEND='s3' or STORAGE_BACKEND='minio'.
+    Credentials provided exclusively through environment variables.
+    Separate quarantine/ and safe/ namespaces.
+    No public URLs - strictly authenticated streaming via get_stream.
     """
 
     def __init__(self):
-        # Initialized on demand when minio/boto3 client is configured
-        pass
+        try:
+            import boto3
+            from botocore.config import Config
+        except ImportError:
+            raise RuntimeError(
+                "boto3 is required for S3CompatibleObjectStorage. "
+                "Install boto3 or configure STORAGE_BACKEND='local'."
+            )
+
+        self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', os.getenv('AWS_STORAGE_BUCKET_NAME', 'tribal-scholar-documents'))
+        self.region = getattr(settings, 'AWS_S3_REGION_NAME', os.getenv('AWS_S3_REGION_NAME', 'ap-south-1'))
+        endpoint_url = getattr(settings, 'AWS_S3_ENDPOINT_URL', os.getenv('AWS_S3_ENDPOINT_URL', None))
+        access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', os.getenv('AWS_ACCESS_KEY_ID', None))
+        secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', os.getenv('AWS_SECRET_ACCESS_KEY', None))
+
+        config = Config(
+            signature_version='s3v4',
+            retries={'max_attempts': 3, 'mode': 'standard'}
+        )
+
+        client_kwargs = {
+            'service_name': 's3',
+            'region_name': self.region,
+            'config': config,
+        }
+        if endpoint_url:
+            client_kwargs['endpoint_url'] = endpoint_url
+        if access_key and secret_key:
+            client_kwargs['aws_access_key_id'] = access_key
+            client_kwargs['aws_secret_access_key'] = secret_key
+
+        self.client = boto3.client(**client_kwargs)
 
     def put_quarantine(self, document_id: str, content: bytes, filename: str) -> str:
-        raise NotImplementedError("S3 storage adapter ready for cloud deployment.")
+        safe_name = os.path.basename(filename) or "document.bin"
+        storage_key = f"quarantine/{document_id}/{safe_name}"
+        self.client.put_object(
+            Bucket=self.bucket_name,
+            Key=storage_key,
+            Body=content,
+            ServerSideEncryption='AES256',
+            Metadata={'document_id': str(document_id)}
+        )
+        return storage_key
 
     def promote_to_safe(self, document_id: str, application_id: str, filename: str) -> str:
-        raise NotImplementedError("S3 storage adapter ready for cloud deployment.")
+        safe_name = os.path.basename(filename) or "document.bin"
+        quarantine_key = f"quarantine/{document_id}/{safe_name}"
+        app_str = str(application_id or 'unbound')
+        safe_key = f"documents/{app_str}/{document_id}/{safe_name}"
+
+        # Copy object within S3 bucket
+        copy_source = {'Bucket': self.bucket_name, 'Key': quarantine_key}
+        self.client.copy_object(
+            CopySource=copy_source,
+            Bucket=self.bucket_name,
+            Key=safe_key,
+            ServerSideEncryption='AES256'
+        )
+        # Delete from quarantine
+        self.client.delete_object(Bucket=self.bucket_name, Key=quarantine_key)
+        return safe_key
 
     def get_stream(self, storage_key: str):
-        raise NotImplementedError("S3 storage adapter ready for cloud deployment.")
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=storage_key)
+            return response['Body']
+        except Exception as exc:
+            raise FileNotFoundError(f"Object not found in S3 at: {storage_key} ({exc})")
 
     def delete_quarantine(self, document_id: str) -> bool:
-        raise NotImplementedError("S3 storage adapter ready for cloud deployment.")
+        prefix = f"quarantine/{document_id}/"
+        try:
+            paginator = self.client.get_paginator('list_objects_v2')
+            for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                objects = [{'Key': obj['Key']} for obj in page.get('Contents', [])]
+                if objects:
+                    self.client.delete_objects(Bucket=self.bucket_name, Delete={'Objects': objects})
+            return True
+        except Exception:
+            return False
 
     def delete_safe(self, storage_key: str) -> bool:
-        raise NotImplementedError("S3 storage adapter ready for cloud deployment.")
+        try:
+            self.client.delete_object(Bucket=self.bucket_name, Key=storage_key)
+            return True
+        except Exception:
+            return False
 
     def exists(self, storage_key: str) -> bool:
-        raise NotImplementedError("S3 storage adapter ready for cloud deployment.")
+        try:
+            self.client.head_object(Bucket=self.bucket_name, Key=storage_key)
+            return True
+        except Exception:
+            return False
 
 
 def get_object_storage() -> ObjectStorage:
-    backend = getattr(settings, 'STORAGE_BACKEND', 'local').lower()
-    if backend in ('s3', 'minio'):
+    backend = getattr(settings, 'STORAGE_BACKEND', os.getenv('STORAGE_BACKEND', 'local')).lower()
+    if backend in ('s3', 'minio', 'r2'):
         return S3CompatibleObjectStorage()
     return LocalObjectStorage()
+

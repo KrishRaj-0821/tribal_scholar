@@ -162,7 +162,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </label>
                     <input
                       type="text"
-                      className="gov-input text-xs font-mono"
+                      className="gov-input text-xs"
                       placeholder="e.g. MOTA/2026/TC/09841"
                       value={trackAppNo}
                       onChange={(e) => setTrackAppNo(e.target.value)}
@@ -177,7 +177,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </label>
                     <input
                       type="date"
-                      className="gov-input text-xs font-mono"
+                      className="gov-input text-xs"
                       required
                     />
                   </div>
@@ -216,7 +216,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             onClick={() => onNavigateTab('wizard')}
             className="flex items-center gap-2 py-1 px-3 hover:text-[#FFC107] whitespace-nowrap transition-colors"
           >
-            <span className="text-[#FFC107] font-mono">01</span>
+            <span className="text-[#FFC107] font-bold">01</span>
             <span>{language === 'hi' ? 'ऑनलाइन आवेदन' : 'APPLY ONLINE'}</span>
           </button>
           <span className="text-[#546E7A] hidden sm:inline">|</span>
@@ -225,7 +225,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             onClick={() => onNavigateTab('dashboard')}
             className="flex items-center gap-2 py-1 px-3 hover:text-[#FFC107] whitespace-nowrap transition-colors"
           >
-            <span className="text-[#FFC107] font-mono">02</span>
+            <span className="text-[#FFC107] font-bold">02</span>
             <span>{language === 'hi' ? 'आवेदक डॉसियर' : 'APPLICANT DOSSIER'}</span>
           </button>
           <span className="text-[#546E7A] hidden sm:inline">|</span>
@@ -234,7 +234,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             onClick={() => onNavigateTab('schemes')}
             className="flex items-center gap-2 py-1 px-3 hover:text-[#FFC107] whitespace-nowrap transition-colors"
           >
-            <span className="text-[#FFC107] font-mono">03</span>
+            <span className="text-[#FFC107] font-bold">03</span>
             <span>{language === 'hi' ? 'योजना नियम एवं पात्रता' : 'SCHEME GUIDELINES'}</span>
           </button>
           <span className="text-[#546E7A] hidden sm:inline">|</span>
@@ -243,7 +243,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             onClick={() => onNavigateTab('deficiency')}
             className="flex items-center gap-2 py-1 px-3 hover:text-[#FFC107] whitespace-nowrap transition-colors"
           >
-            <span className="text-[#FFC107] font-mono">04</span>
+            <span className="text-[#FFC107] font-bold">04</span>
             <span>{language === 'hi' ? 'दस्तावेज़ कमी निवारण' : 'RESOLVE DEFICIENCY'}</span>
           </button>
           <span className="text-[#546E7A] hidden sm:inline">|</span>
@@ -252,9 +252,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
             onClick={() => onNavigateTab('grievance')}
             className="flex items-center gap-2 py-1 px-3 hover:text-[#FFC107] whitespace-nowrap transition-colors"
           >
-            <span className="text-[#FFC107] font-mono">05</span>
+            <span className="text-[#FFC107] font-bold">05</span>
             <span>{language === 'hi' ? 'सीपीग्राम्स शिकायत' : 'GRIEVANCE (CPGRAMS)'}</span>
           </button>
+
         </div>
       </nav>
 
@@ -560,7 +561,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 className="bg-[#FFFFFF] border-l-4 border-l-[#1D0A69] border-t border-r border-b border-[#CFD8DC] p-5 relative"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono text-xl font-extrabold text-[#1D0A69]">
+                  <span className="text-xl font-extrabold text-[#1D0A69]">
                     {step.num}
                   </span>
                   <span className="text-[10px] font-bold text-[#C85A17] uppercase tracking-wider">

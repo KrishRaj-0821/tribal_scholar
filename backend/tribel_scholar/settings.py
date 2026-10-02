@@ -22,15 +22,32 @@ load_dotenv()
 # Add apps to sys.path
 sys.path.insert(0, str(BASE_DIR / 'apps'))
 
+# Environment detection
+IS_RAILWAY = bool(os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_PROJECT_ID'))
+
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-mota-sih-26239-foundation-secret-key-tribal-scholar')
 
-DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
+# In Railway production, DEBUG defaults to False unless explicitly overridden
+DEBUG = os.getenv('DJANGO_DEBUG', 'False' if IS_RAILWAY else 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
+# Strict Host Verification
+allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()]
+elif IS_RAILWAY:
+    ALLOWED_HOSTS = [
+        '.railway.app',
+        '.up.railway.app',
+        'localhost',
+        '127.0.0.1',
+    ]
+else:
+    ALLOWED_HOSTS = ['*']
 
-# CSRF Trusted Origins for HTTPS (e.g. Railway domains *.railway.app, *.up.railway.app)
-csrf_trusted_env = os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.railway.app,https://*.up.railway.app')
+# CSRF Trusted Origins for HTTPS
+csrf_trusted_env = os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.railway.app,https://*.up.railway.app,https://tribalscholar.up.railway.app')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_env.split(',') if origin.strip()]
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -207,7 +224,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'EXCEPTION_HANDLER': 'apps.core.views.custom_exception_handler',
 }
 
 cors_allowed_env = os.getenv('CORS_ALLOWED_ORIGINS')
@@ -215,11 +232,31 @@ if cors_allowed_env:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_allowed_env.split(',') if origin.strip()]
     CORS_ALLOW_ALL_ORIGINS = False
 else:
-    CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', str(DEBUG)).lower() in ('true', '1')
+    CORS_ALLOW_ALL_ORIGINS = False if (IS_RAILWAY or not DEBUG) else True
     CORS_ALLOWED_ORIGINS = [
+        'https://tribalscholar.up.railway.app',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
     ]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.railway\.app$",
+    r"^https://.*\.up\.railway\.app$",
+]
+
+# Security Headers & Cookie Flags
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 
 # Redis Configuration
 REDIS_URL = os.getenv('REDIS_URL') or os.getenv('REDIS_PRIVATE_URL')

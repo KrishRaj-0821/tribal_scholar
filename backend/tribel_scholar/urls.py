@@ -45,9 +45,14 @@ router.register(r'application-status-history', ApplicationStatusHistoryViewSet, 
 router.register(r'audit-logs', AuditLogViewSet, basename='audit-log')
 
 from django.views.generic import RedirectView
+from apps.core.views import HealthLiveView, HealthReadyView
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/api/v1/', permanent=False), name='api-root-redirect'),
+    path('health/live/', HealthLiveView.as_view(), name='health-live'),
+    path('health/live', HealthLiveView.as_view(), name='health-live-noslash'),
+    path('health/ready/', HealthReadyView.as_view(), name='health-ready'),
+    path('health/ready', HealthReadyView.as_view(), name='health-ready-noslash'),
     path('admin/', admin.site.urls),
     path('api/v1/schemes/<uuid:scheme_version_id>/application-form/', SchemeApplicationFormView.as_view(), name='scheme-application-form'),
     path('api/v1/schemes/<str:scheme_version_id>/application-form/', SchemeApplicationFormView.as_view(), name='scheme-application-form-str'),

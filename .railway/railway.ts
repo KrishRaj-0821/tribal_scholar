@@ -32,14 +32,14 @@ export default defineRailway(() => {
     },
     deploy: {
       startCommand: "/app/start.sh",
-      healthcheckPath: "/api/v1/",
+      healthcheckPath: "/health/live",
       healthcheckTimeout: 300,
       restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 5,
     },
     replicas: { "us-west2": 1 },
     env: {
-      CSRF_TRUSTED_ORIGINS: "https://*.railway.app,https://*.up.railway.app",
+      CSRF_TRUSTED_ORIGINS: "https://*.railway.app,https://*.up.railway.app,https://tribalscholar.up.railway.app",
       DATABASE_URL: Postgres.env.DATABASE_URL,
       DATABASE_ENGINE: "postgresql",
       DJANGO_ALLOWED_HOSTS: "*",
@@ -47,10 +47,34 @@ export default defineRailway(() => {
       DJANGO_SECRET_KEY: preserve(),
       REDIS_URL: Redis.env.REDIS_URL,
       STORAGE_BACKEND: "local",
+      MALWARE_SCANNER_BACKEND: "clamav",
+    },
+  });
+  const worker = service("worker", {
+    source: tribal_scholar,
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "Dockerfile.backend",
+    },
+    deploy: {
+      startCommand: "/app/start-worker.sh",
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 5,
+    },
+    replicas: { "us-west2": 1 },
+    env: {
+      DATABASE_URL: Postgres.env.DATABASE_URL,
+      DATABASE_ENGINE: "postgresql",
+      DJANGO_DEBUG: "False",
+      DJANGO_SECRET_KEY: preserve(),
+      REDIS_URL: Redis.env.REDIS_URL,
+      STORAGE_BACKEND: "local",
+      MALWARE_SCANNER_BACKEND: "clamav",
     },
   });
 
   return project("tribal-scholar", {
-    resources: [frontend, backend, Redis, Postgres, redisVolume, postgresVolume],
+    resources: [frontend, backend, worker, Redis, Postgres, redisVolume, postgresVolume],
   });
 });
+

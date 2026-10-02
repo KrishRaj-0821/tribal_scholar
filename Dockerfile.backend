@@ -16,7 +16,7 @@ COPY backend/requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ /app/
-RUN chmod +x /app/start.sh
+RUN chmod +x /app/start.sh /app/start-worker.sh
 
 EXPOSE 8000
 

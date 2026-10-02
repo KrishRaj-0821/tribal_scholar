@@ -55,7 +55,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
               </div>
 
               <div className="space-y-0.5">
-                <div className="flex items-center gap-2 text-xs font-mono text-[#FFC107]">
+                <div className="flex items-center gap-2 text-xs font-medium text-[#FFC107]">
                   <span>PERMANENT SCHOLARSHIP IDENTIFIER</span>
                   <span>•</span>
                   <span>OTR ONBOARDING</span>
@@ -212,7 +212,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                     <label className="gov-label text-xs">Active Mobile (Linked with Aadhaar) <span className="gov-req">*</span></label>
                     <input
                       type="tel"
-                      className="gov-input text-xs font-mono"
+                      className="gov-input text-xs"
                       value={mobile}
                       onChange={(e) => setMobile(e.target.value)}
                       required
@@ -259,7 +259,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                   <label className="gov-label text-xs">Revenue ST Caste Certificate Number <span className="gov-req">*</span></label>
                   <input
                     type="text"
-                    className="gov-input text-xs font-mono font-bold text-[#1D0A69]"
+                    className="gov-input text-xs font-bold text-[#1D0A69]"
                     value={casteCertNo}
                     onChange={(e) => setCasteCertNo(e.target.value)}
                     placeholder="e.g. JH/ST/2022/883910"

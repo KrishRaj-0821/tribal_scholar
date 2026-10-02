@@ -63,7 +63,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
 
               <div className="space-y-0.5">
-                <div className="flex items-center gap-2 text-xs font-mono text-[#FFC107]">
+                <div className="flex items-center gap-2 text-xs font-medium text-[#FFC107]">
                   <span>GOVERNMENT OF INDIA</span>
                   <span>•</span>
                   <span>DIGITAL IDENTITY GATEWAY</span>
@@ -171,7 +171,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </label>
                 <input
                   type="text"
-                  className="gov-input text-xs font-mono font-bold text-[#1D0A69]"
+                  className="gov-input text-xs font-bold text-[#1D0A69]"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder={roleTab === 'applicant' ? 'OTR-2026-ST-884912' : 'sk.mahapatra@nic.in'}
@@ -200,7 +200,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     type="text"
                     maxLength={6}
                     placeholder="Enter 6-digit code"
-                    className="gov-input text-xs font-mono tracking-widest text-center font-bold"
+                    className="gov-input text-xs tracking-widest text-center font-bold"
                     value={otpValue}
                     onChange={(e) => setOtpValue(e.target.value)}
                   />
@@ -258,7 +258,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   </div>
                   <input
                     type="text"
-                    className="gov-input text-xs font-mono uppercase font-bold"
+                    className="gov-input text-xs uppercase font-bold"
                     placeholder="ENTER CAPTCHA"
                     value={captchaInput}
                     onChange={(e) => setCaptchaInput(e.target.value)}

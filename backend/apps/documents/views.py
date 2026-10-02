@@ -145,6 +145,23 @@ class ApplicationDocumentUploadView(APIView):
             return Response({"error": f"Internal upload error: {exc}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def check_document_access(user, document) -> bool:
+    """
+    Object-level authorization check:
+    Returns True if user is the document owner or an authorized officer/staff/admin.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    is_owner = (document.applicant_id == user.id)
+    is_staff_or_admin = bool(
+        getattr(user, 'is_officer', False) or
+        getattr(user, 'is_staff', False) or
+        getattr(user, 'is_superuser', False) or
+        getattr(user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER', 'DISTRICT_OFFICER')
+    )
+    return is_owner or is_staff_or_admin
+
+
 class DocumentDetailView(APIView):
     """
     GET /api/v1/documents/{id}/
@@ -157,13 +174,7 @@ class DocumentDetailView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        # Authorization: Applicant (own application) or Staff/Officer/Admin
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to view status for this document.")
 
         serializer = DocumentStatusSerializer(document)
@@ -183,13 +194,8 @@ class DocumentDownloadView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        # Authorization check
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        # Object-level authorization check
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to download this document.")
 
         # Security check: rejected / infected files cannot be downloaded
@@ -242,13 +248,8 @@ class DocumentOCRStatusView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        # Authorization check
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        # Object-level authorization check
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to access this document's OCR status.")
 
         from .models import OCRJob
@@ -277,12 +278,7 @@ class DocumentOCRResultView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to view this document's OCR results.")
 
         from .models import OCRResult
@@ -310,12 +306,7 @@ class DocumentClassificationView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to view this classification.")
 
         from .models import DocumentClassificationResult
@@ -343,12 +334,7 @@ class DocumentExtractedFieldsView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to view extracted fields.")
 
         from .models import ProvisionalExtractedField
@@ -370,12 +356,7 @@ class DocumentTriggerOCRView(APIView):
         target_id = document_id or pk
         document = get_object_or_404(ApplicantDocument, id=target_id)
 
-        is_owner = (document.applicant_id == request.user.id)
-        is_staff_or_admin = (
-            getattr(request.user, 'is_staff', False) or
-            getattr(request.user, 'role', '') in ('ADMIN', 'SCRUTINY_OFFICER', 'STATE_NODAL_OFFICER')
-        )
-        if not (is_owner or is_staff_or_admin):
+        if not check_document_access(request.user, document):
             raise PermissionDenied("You are not authorized to trigger OCR for this document.")
 
         from .ocr_service import OCRService, InvalidDocumentStateForOCRError
