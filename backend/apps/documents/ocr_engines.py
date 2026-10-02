@@ -143,29 +143,16 @@ class PaddleOCREngine(BaseOCREngine):
                 from paddleocr import PaddleOCR
                 # PaddleOCR lightweight CPU initialization:
                 # Disable heavy unwarping and doc orientation models to reduce memory footprint by 70%
-                try:
-                    client = PaddleOCR(
-                        lang=self.lang,
-                        device='cpu',
-                        enable_mkldnn=False,
-                        use_doc_orientation_classify=False,
-                        use_doc_unwarping=False,
-                        use_textline_orientation=False,
-                    )
-                except TypeError:
-                    try:
-                        client = PaddleOCR(
-                            lang=self.lang,
-                            enable_mkldnn=False,
-                            use_doc_orientation_classify=False,
-                            use_doc_unwarping=False,
-                            use_textline_orientation=False,
-                        )
-                    except TypeError:
-                        try:
-                            client = PaddleOCR(lang=self.lang, enable_mkldnn=False)
-                        except TypeError:
-                            client = PaddleOCR(lang=self.lang)
+                client = PaddleOCR(
+                    lang=self.lang,
+                    device='cpu',
+                    enable_mkldnn=False,
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=False,
+                    text_det_limit_side_len=700,
+                    text_det_limit_type='max',
+                )
 
                 PaddleOCREngine._paddle_ocr_clients[self.lang] = client
                 return client
@@ -200,11 +187,11 @@ class PaddleOCREngine(BaseOCREngine):
         client = self._get_client()
 
         try:
-            # PaddleOCR 3.x supports predict(), while 2.x uses ocr()
+            # PaddleOCR 3.x explicit predict() API validation
             if hasattr(client, 'predict'):
                 results = list(client.predict(img_np, text_det_limit_side_len=MAX_DET_SIDE, text_det_limit_type='max'))
             else:
-                results = client.ocr(img_np, cls=self.use_angle_cls)
+                raise RuntimeError("PaddleOCR 3.x predict() API is required; legacy ocr() fallback is deprecated.")
         except Exception as exc:
             logger.error(f"PaddleOCR execution failed on page {page_num}: {exc}")
             raise RuntimeError(f"PaddleOCR processing error on page {page_num}: {exc}")

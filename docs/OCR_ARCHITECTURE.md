@@ -151,8 +151,10 @@ class BaseOCREngine(ABC):
 ```
 
 ### PaddleOCR Engine Adapter (`PaddleOCREngine`)
-* Primary production engine (`paddleocr==3.7.0`, `paddlepaddle==3.3.1`).
-* Configured with `enable_mkldnn=False` for reliable Windows AMD64 CPU execution without oneDNN PIR attribute conflicts.
+* Primary production engine (`paddleocr==3.7.0`, `paddlepaddle==3.2.2` CPU, `pypdfium2==5.13.0`, `python==3.13.x`).
+* Direct PaddleOCR 3.x `predict()` pipeline path (legacy `ocr()` fallback removed).
+* Bounded CPU execution (`MAX_DET_SIDE = 700`, `text_det_limit_side_len = 700`, `text_det_limit_type = 'max'`).
+* Disabled heavy pre-processing: `use_doc_unwarping=False`, `use_doc_orientation_classify=False`, `use_textline_orientation=False`, `enable_mkldnn=False`.
 * Returns normalized `RawOCRBlock` representations containing text, confidence, and 4-point bounding polygons.
 
 ### Mock OCR Engine (`MockOCREngine`)
