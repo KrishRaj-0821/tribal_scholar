@@ -10,4 +10,6 @@ urlpatterns = [
     path('logout', LogoutView.as_view(), name='auth-logout-noslash'),
     path('me/', MeView.as_view(), name='auth-me'),
     path('me', MeView.as_view(), name='auth-me-noslash'),
+    path('session/', MeView.as_view(), name='auth-session'),
+    path('session', MeView.as_view(), name='auth-session-noslash'),
 ]

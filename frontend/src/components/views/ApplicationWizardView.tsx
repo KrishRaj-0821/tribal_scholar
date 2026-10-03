@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
-import { useLanguage } from '../../context/LanguageContext';
-import { useDemo } from '../../context/DemoContext';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { OFFICIAL_MOTA_SCHEMES, SchemeInfo } from '../../theme/tokens';
+import { applicationApi, vaultApi, VaultDocument } from '../../services/api';
 import { TribalPattern } from '../common/TribalPattern';
 import { 
   CheckCircle2, ArrowRight, ArrowLeft, 
-  FileText, ShieldCheck, UploadCloud, AlertCircle, 
-  FileCheck2, User, BookOpen, Landmark, Save, Sparkles
+  FileText, ShieldCheck, AlertCircle, 
+  User, BookOpen, Save, Sparkles, FolderLock, 
+  RefreshCw, Check
 } from 'lucide-react';
 
 interface ApplicationWizardViewProps {
   initialScheme?: SchemeInfo | null;
-  onSubmitted: () => void;
-  onCancel: () => void;
+  onSubmitted?: () => void;
+  onCancel?: () => void;
 }
 
 export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
@@ -20,43 +22,185 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   onSubmitted,
   onCancel
 }) => {
-  const { language } = useLanguage();
-  const { applicant, setCurrentStep: setDemoStep } = useDemo();
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [selectedSchemeCode, setSelectedSchemeCode] = useState<string>(initialScheme?.code || 'TOP-05');
-  const [draftSavedMsg, setDraftSavedMsg] = useState<string | null>(null);
-  
-  // Demographic and Form fields (Prefilled with Demo ST Applicant)
-  const [fullName, setFullName] = useState(applicant.name || 'Demo ST Applicant');
-  const [fatherName, setFatherName] = useState('Shri Rameshwar Munda');
-  const [motherName, setMotherName] = useState('Smt. Radha Munda');
-  const [stateName, setStateName] = useState(applicant.state || 'Madhya Pradesh');
-  const [districtName] = useState(applicant.district || 'Mandla');
-  const [categoryName, setCategoryName] = useState(applicant.category || 'Scheduled Tribe (ST)');
-  const [institutionName, setInstitutionName] = useState(applicant.institution || 'Synthetic Demo University (IIT Indore)');
-  const [aisheCode, setAisheCode] = useState('U-0570');
-  const [courseName, setCourseName] = useState(applicant.course || 'Postgraduate (M.Tech CSE)');
-  const [admissionYear, setAdmissionYear] = useState('2026');
-  const [annualIncome, setAnnualIncome] = useState(String(applicant.declaredIncome || '500000'));
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSaveDraft = () => {
-    setDraftSavedMsg("✓ Application draft securely cached in sovereign state storage.");
-    setTimeout(() => setDraftSavedMsg(null), 4000);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [selectedScheme] = useState<SchemeInfo>(initialScheme || OFFICIAL_MOTA_SCHEMES[2]); // Top Class
+  
+  // Real Backend Application Record
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [applicationNumber, setApplicationNumber] = useState<string>('CREATING...');
+  const [creatingApp, setCreatingApp] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Reusable information from Vault & Profile
+  const [reusableFields, setReusableFields] = useState<Record<string, any>>({});
+  const [vaultDocuments, setVaultDocuments] = useState<VaultDocument[]>([]);
+  const [usedVaultSources, setUsedVaultSources] = useState<Record<string, string>>({});
+
+  // Form Fields
+  const [fullName, setFullName] = useState(user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Rajeshwar Soren');
+  const [fatherName, setFatherName] = useState('Shri Rameshwar Soren');
+  const [stateName, setStateName] = useState('Jharkhand');
+  const [districtName, setDistrictName] = useState('Ranchi');
+  const [community, setCommunity] = useState('ST');
+  const [casteCertNo, setCasteCertNo] = useState('');
+  const [institutionName, setInstitutionName] = useState('IIT Kharagpur');
+  const [aisheCode, setAisheCode] = useState('U-0570');
+  const [courseName, setCourseName] = useState('B.Tech Computer Science');
+  const [admissionYear, setAdmissionYear] = useState('2026');
+  const [annualIncome, setAnnualIncome] = useState<string>('500000');
+  const [incomeCertNo, setIncomeCertNo] = useState('');
+
+  // Income reuse decision
+  const [incomeReusePromptDismissed, setIncomeReusePromptDismissed] = useState<boolean>(false);
+  const [casteReusePromptDismissed, setCasteReusePromptDismissed] = useState<boolean>(false);
+
+  // Initialize or fetch backend Application dossier and load Document Vault
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeDossier = async () => {
+      setCreatingApp(true);
+      setErrorMessage(null);
+
+      try {
+        // 1. Fetch reusable fields from Document Vault & Profile
+        const [reusableRes, vaultRes] = await Promise.allSettled([
+          vaultApi.getReusableFields(),
+          vaultApi.getDocuments(),
+        ]);
+
+        if (reusableRes.status === 'fulfilled' && isMounted) {
+          const rf = reusableRes.value;
+          setReusableFields(rf);
+
+          // Auto-fill from profile initially if available
+          if (rf['community']) {
+            setCommunity(rf['community'].value);
+            setUsedVaultSources(prev => ({ ...prev, community: rf['community'].source }));
+          }
+        }
+
+        if (vaultRes.status === 'fulfilled' && isMounted) {
+          setVaultDocuments(vaultRes.value?.documents || []);
+        }
+
+        // 2. Create actual backend Application record
+        const appRes = await applicationApi.create({
+          scheme_code: selectedScheme.code,
+        });
+
+        if (isMounted) {
+          setApplicationId(appRes.id);
+          setApplicationNumber(appRes.application_number);
+        }
+      } catch (err: any) {
+        console.error('Failed to initialize application', err);
+        if (isMounted) {
+          setErrorMessage(err.message || 'Failed to create application on sovereign server.');
+        }
+      } finally {
+        if (isMounted) setCreatingApp(false);
+      }
+    };
+
+    initializeDossier();
+    return () => { isMounted = false; };
+  }, [selectedScheme]);
+
+  // Handler to apply reusable information from Vault (Requirement 14, 16, 28)
+  const applyIncomeFromVault = () => {
+    const vaultIncome = reusableFields['annual_family_income'];
+    if (vaultIncome) {
+      setAnnualIncome(String(vaultIncome.value));
+      setUsedVaultSources(prev => ({
+        ...prev,
+        annual_family_income: `Information found in your saved document (${vaultIncome.source_label})`
+      }));
+    }
+    setIncomeReusePromptDismissed(true);
+  };
+
+  const applyCasteFromVault = () => {
+    const vaultCaste = reusableFields['caste_certificate_number'];
+    if (vaultCaste) {
+      setCasteCertNo(String(vaultCaste.value));
+      setUsedVaultSources(prev => ({
+        ...prev,
+        caste_certificate_number: `Information found in your saved document (${vaultCaste.source_label})`
+      }));
+    }
+    setCasteReusePromptDismissed(true);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!applicationId) return;
+    setErrorMessage(null);
+    try {
+      await applicationApi.saveForm(applicationId, {
+        annual_family_income: annualIncome,
+        caste_certificate_number: casteCertNo,
+        institution_name: institutionName,
+        course_name: courseName,
+      });
+      setSaveSuccessMsg("✓ Application progress securely saved to MoTA sovereign database.");
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to save draft.');
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    if (!applicationId) return;
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      // 1. Save all fields to authoritative backend form
+      await applicationApi.saveForm(applicationId, {
+        annual_family_income: annualIncome,
+        caste_certificate_number: casteCertNo,
+        community,
+        institution_name: institutionName,
+        course_name: courseName,
+      });
+
+      // 2. Submit with Idempotency Key
+      const idempotencyKey = `submit_${applicationId}_${Date.now()}`;
+      await applicationApi.submit(applicationId, idempotencyKey);
+
+      setSubmitSuccess(true);
+      if (onSubmitted) {
+        onSubmitted();
+      } else {
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 1500);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Submission failed. Please check required fields.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const steps = [
-    { num: 1, icon: User, titleEn: 'PERSONAL', titleHi: 'व्यक्तिगत' },
-    { num: 2, icon: BookOpen, titleEn: 'ACADEMIC', titleHi: 'शैक्षणिक' },
-    { num: 3, icon: Landmark, titleEn: 'SCHEME', titleHi: 'योजना' },
-    { num: 4, icon: ShieldCheck, titleEn: 'FINANCIAL', titleHi: 'वित्तीय / बैंक' },
-    { num: 5, icon: FileText, titleEn: 'DOCUMENTS', titleHi: 'दस्तावेज़' },
-    { num: 6, icon: CheckCircle2, titleEn: 'REVIEW', titleHi: 'समीक्षा' }
+    { num: 1, icon: User, title: 'Personal Details' },
+    { num: 2, icon: BookOpen, title: 'Academic' },
+    { num: 3, icon: ShieldCheck, title: 'Financial & Income' },
+    { num: 4, icon: FolderLock, title: 'Document Vault' },
+    { num: 5, icon: CheckCircle2, title: 'Review & Submit' }
   ];
 
   return (
     <div className="bg-[#EBEAEA]/50 min-h-screen pb-20">
       
-      {/* 1. Sovereign Application Masthead with Tribal Identity Ribbon */}
+      {/* 1. Masthead */}
       <header className="bg-[#1D0A69] text-white border-b-4 border-[#FFC107] relative overflow-hidden">
         <TribalPattern family="woven" opacity={0.08} color="#FFC107" className="absolute inset-0 pointer-events-none" />
 
@@ -64,31 +208,33 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs font-mono text-[#FFC107]">
-                <span>FORM-MOTA-SCH-2026</span>
+                <span>APPLICATION DOSSIER: <strong>{applicationNumber}</strong></span>
                 <span>•</span>
-                <span>OTR-2026-ST-884912</span>
+                <span>AY 2026-27</span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold font-serif text-white tracking-tight">
-                {language === 'hi' 
-                  ? 'केंद्रीय अनुसूचित जनजाति छात्रवृत्ति ऑनलाइन आवेदन प्रपत्र' 
-                  : 'Central ST Scholarship & Fellowship Application Portal'}
+                {selectedScheme.titleEn} ({selectedScheme.code})
               </h1>
               <p className="text-xs text-[#EBEAEA]/80">
-                Academic Year 2026-27 • Ministry of Tribal Affairs, Government of India
+                Official Ministry of Tribal Affairs Sovereign Application Workflow
               </p>
             </div>
 
             {/* Autosave and Exit */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded border border-white/20 text-xs">
-                <span className="w-2 h-2 rounded-full bg-[#198754] animate-pulse"></span>
-                <span className="text-[#EBEAEA] font-medium">Autosaved to Secure Local Cache</span>
-              </div>
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5 text-[#FFC107]" />
+                <span>Save Draft</span>
+              </button>
 
               <button
                 type="button"
-                onClick={onCancel}
-                className="text-xs text-white/80 hover:text-white underline hover:no-underline font-semibold px-2 py-1"
+                onClick={() => onCancel ? onCancel() : navigate('/dashboard')}
+                className="text-xs text-white/80 hover:text-white underline font-semibold px-2 py-1"
               >
                 Exit Form
               </button>
@@ -97,10 +243,17 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
         </div>
       </header>
 
-      {/* 2. Public Service Stepper Ribbon (Non-Card) */}
-      <nav className="bg-white border-b border-[#CFD8DC] sticky top-12 z-30 shadow-xs" aria-label="Application Progress">
+      {/* 2. Success and Save alerts */}
+      {saveSuccessMsg && (
+        <div className="bg-[#E8F5E9] text-[#1B5E20] border-b border-[#A5D6A7] py-2 px-4 text-xs font-bold text-center">
+          {saveSuccessMsg}
+        </div>
+      )}
+
+      {/* 3. Stepper Ribbon */}
+      <nav className="bg-white border-b border-[#CFD8DC] sticky top-12 z-20 shadow-xs">
         <div className="gov-container">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-[#ECEFF1] text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-[#ECEFF1] text-xs">
             {steps.map((st) => {
               const isCurrent = currentStep === st.num;
               const isCompleted = currentStep > st.num;
@@ -115,13 +268,12 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     isCurrent
                       ? 'bg-[#1D0A69] text-white font-bold border-b-2 border-b-[#FFC107]'
                       : isCompleted
-                      ? 'bg-[#E8F5E9]/50 text-[#198754] font-semibold hover:bg-[#E8F5E9]'
+                      ? 'bg-[#E8F5E9]/60 text-[#198754] font-semibold'
                       : 'bg-white text-[#546E7A] hover:bg-[#F8F9FA]'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isCurrent ? 'text-[#FFC107]' : isCompleted ? 'text-[#198754]' : 'text-[#90A4AE]'}`} />
-                  <span className="truncate">{language === 'hi' ? st.titleHi : st.titleEn}</span>
-                  {isCompleted && <span className="text-[10px] font-bold">✓</span>}
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="truncate">{st.num}. {st.title}</span>
                 </button>
               );
             })}
@@ -129,485 +281,541 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
         </div>
       </nav>
 
-      {/* 3. Main Form Dossier Layout (Document Surface) */}
-      <main className="gov-container py-8">
-        <div className="max-w-4xl mx-auto bg-white border border-[#CFD8DC] rounded-lg shadow-sm overflow-hidden">
-          
-          {/* Top Form Header with Document Watermark */}
-          <div className="p-6 border-b border-[#ECEFF1] bg-[#F8F9FA] flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <span className="text-[11px] font-bold text-[#1D0A69] uppercase tracking-wider block">
-                Statutory Dossier Step {currentStep} of 6
-              </span>
-              <h2 className="text-lg font-bold text-[#150202] font-serif">
-                {currentStep === 1 && 'Personal & Demographic Credentials (Aadhaar Seeded)'}
-                {currentStep === 2 && 'Institutional Enrollment & Academic Records'}
-                {currentStep === 3 && 'Select Targeted ST Scholarship / Fellowship Scheme'}
-                {currentStep === 4 && 'Direct Benefit Transfer (DBT) & NPCI Account Mapping'}
-                {currentStep === 5 && 'Evidentiary Document Ingestion & Integrity Pipeline'}
-                {currentStep === 6 && 'Statutory Declaration & Final Submission Dossier'}
-              </h2>
+      {/* 4. Form Viewport */}
+      <div className="gov-container py-8">
+        
+        {creatingApp ? (
+          <div className="bg-white p-12 rounded-xl border border-[#CFD8DC] text-center max-w-lg mx-auto shadow-xs">
+            <RefreshCw className="w-8 h-8 animate-spin text-[#1D0A69] mx-auto mb-3" />
+            <h3 className="font-bold text-base text-[#1D0A69]">Initializing Sovereign Application Dossier</h3>
+            <p className="text-xs text-[#546E7A] mt-1">
+              Establishing official backend application record and binding statutory scheme rules...
+            </p>
+          </div>
+        ) : submitSuccess ? (
+          <div className="bg-white p-10 rounded-xl border border-[#A5D6A7] text-center max-w-lg mx-auto shadow-md">
+            <div className="w-16 h-16 bg-[#E8F5E9] text-[#2E7D32] rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-10 h-10" />
             </div>
-
-            <div className="text-right text-xs">
-              <span className="text-[#546E7A]">Applicant: </span>
-              <strong className="text-[#1D0A69]">{fullName}</strong>
-              <span className="ml-1.5 bg-[#FFC107] text-[#1D0A69] font-extrabold px-1.5 py-0.5 rounded text-[10px]">
-                SYNTHETIC DEMO
-              </span>
+            <h2 className="text-xl font-bold text-[#1D0A69]">Application Successfully Submitted!</h2>
+            <p className="text-xs text-[#546E7A] mt-2">
+              Your application dossier <strong>{applicationNumber}</strong> has entered the official MoTA verification pipeline.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="bg-[#1D0A69] text-white px-5 py-2.5 rounded font-bold text-xs shadow-sm hover:bg-[#15074D]"
+              >
+                Go to Applicant Dashboard
+              </button>
             </div>
           </div>
-
-          {draftSavedMsg && (
-            <div className="mx-6 sm:mx-8 mt-4 p-2.5 bg-[#E8F5E9] border border-[#A5D6A7] rounded text-xs text-[#1B5E20] font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#198754]" />
-              <span>{draftSavedMsg}</span>
-            </div>
-          )}
-
-          <div className="p-6 sm:p-8 space-y-6">
+        ) : (
+          <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-xs border border-[#CFD8DC] overflow-hidden">
             
-            {/* STEP 1: PERSONAL DETAILS */}
-            {currentStep === 1 && (
-              <div className="space-y-6">
-                <div className="p-3 bg-[#E8F5E9] border border-[#A5D6A7] rounded text-xs text-[#1B5E20] flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#198754] flex-shrink-0" />
-                    <span>Demographic credentials pre-filled from your verified UIDAI Aadhaar e-KYC record (Mandla, MP).</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded font-bold text-[#1D0A69] border border-[#A5D6A7]">
-                    Aadhaar Linked
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                  <div>
-                    <label className="gov-label text-xs">Full Name as per Aadhaar Record</label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs bg-[#F4F6F8] font-bold text-[#150202]" 
-                      value={fullName} 
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="gov-label text-xs">One-Time Registration (OTR) ID</label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs font-mono bg-[#F4F6F8] font-bold text-[#1D0A69]" 
-                      value="OTR-2026-ST-884912" 
-                      readOnly 
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                  <div>
-                    <label className="gov-label text-xs">Father's Full Name <span className="gov-req">*</span></label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs" 
-                      value={fatherName} 
-                      onChange={(e) => setFatherName(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <div>
-                    <label className="gov-label text-xs">Mother's Full Name <span className="gov-req">*</span></label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs" 
-                      value={motherName} 
-                      onChange={(e) => setMotherName(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-xs">
-                  <div>
-                    <label className="gov-label text-xs">Scheduled Tribe (ST) Community</label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs bg-[#F4F6F8] font-semibold text-[#150202]" 
-                      value={categoryName} 
-                      onChange={(e) => setCategoryName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="gov-label text-xs">State / UT of Domicile</label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs bg-[#F4F6F8] font-semibold text-[#150202]" 
-                      value={`${districtName}, ${stateName}`} 
-                      onChange={(e) => setStateName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="gov-label text-xs">Declared Annual Family Income (₹) <span className="gov-req">*</span></label>
-                    <input 
-                      type="number" 
-                      className="gov-input text-xs font-bold text-[#1D0A69]" 
-                      value={annualIncome} 
-                      onChange={(e) => setAnnualIncome(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                </div>
+            {errorMessage && (
+              <div className="p-4 bg-[#FFEBEE] border-b border-[#FFCDD2] text-[#C62828] text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{errorMessage}</span>
               </div>
             )}
 
-            {/* STEP 2: ACADEMIC DETAILS */}
-            {currentStep === 2 && (
-              <div className="space-y-6 text-xs">
-                <div>
-                  <label className="gov-label text-xs">Enrolled Educational Institution <span className="gov-req">*</span></label>
-                  <input 
-                    type="text" 
-                    className="gov-input text-xs font-bold text-[#150202]" 
-                    value={institutionName} 
-                    onChange={(e) => setInstitutionName(e.target.value)} 
-                    required 
-                  />
-                  <span className="text-[11px] text-[#546E7A] mt-1 block">
-                    Must be in the official MoTA Notified Premier Institutes Gazette for AY 2026-27.
-                  </span>
-                </div>
+            <div className="p-6 sm:p-8 space-y-6">
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* ─────────────────────────────────────────────────────────────
+                  STEP 1: PERSONAL DETAILS
+                  ───────────────────────────────────────────────────────────── */}
+              {currentStep === 1 && (
+                <div className="space-y-4">
                   <div>
-                    <label className="gov-label text-xs">AISHE / UDISE+ Institutional Code <span className="gov-req">*</span></label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs font-mono font-bold text-[#1D0A69]" 
-                      value={aisheCode} 
-                      onChange={(e) => setAisheCode(e.target.value)} 
-                      required 
-                    />
+                    <h3 className="text-base font-bold text-[#1D0A69]">
+                      1. Applicant Personal & Demographic Information
+                    </h3>
+                    <p className="text-xs text-[#546E7A]">
+                      Pre-filled from your authenticated candidate profile.
+                    </p>
                   </div>
-                  <div>
-                    <label className="gov-label text-xs">Year of Formal Admission <span className="gov-req">*</span></label>
-                    <input 
-                      type="text" 
-                      className="gov-input text-xs" 
-                      value={admissionYear} 
-                      onChange={(e) => setAdmissionYear(e.target.value)} 
-                      required 
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Full Legal Name</label>
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
+                      <span className="text-[10px] text-[#2E7D32] font-semibold mt-0.5 block">
+                        ✓ Verified via OTR Identity
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Father's / Guardian's Name</label>
+                      <input
+                        type="text"
+                        value={fatherName}
+                        onChange={(e) => setFatherName(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="gov-label text-xs">Degree / Course Name <span className="gov-req">*</span></label>
-                  <input 
-                    type="text" 
-                    className="gov-input text-xs" 
-                    value={courseName} 
-                    onChange={(e) => setCourseName(e.target.value)} 
-                    required 
-                  />
-                </div>
-              </div>
-            )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Home State Domicile</label>
+                      <input
+                        type="text"
+                        value={stateName}
+                        onChange={(e) => setStateName(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
+                    </div>
 
-            {/* STEP 3: SCHEME SELECTION */}
-            {currentStep === 3 && (
-              <div className="space-y-4 text-xs">
-                <div className="p-3 bg-[#F4F6F8] rounded border border-[#CFD8DC] text-[#546E7A]">
-                  Select the statutory scheme corresponding to your academic level. Each scheme operates under distinct Gazette criteria and budget outlays.
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Home District</label>
+                      <input
+                        type="text"
+                        value={districtName}
+                        onChange={(e) => setDistrictName(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
+                    </div>
+                  </div>
 
-                <div className="space-y-3">
-                  {OFFICIAL_MOTA_SCHEMES.map((scheme) => {
-                    const isSelected = selectedSchemeCode === scheme.code;
-                    return (
-                      <label 
-                        key={scheme.code} 
-                        className={`block p-4 rounded-md border-2 cursor-pointer transition-all ${
-                          isSelected 
-                            ? 'border-[#1D0A69] bg-[#1D0A69]/5 shadow-sm' 
-                            : 'border-[#CFD8DC] bg-white hover:border-[#90A4AE]'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="radio"
-                            name="schemeSelect"
-                            value={scheme.code}
-                            checked={isSelected}
-                            onChange={() => setSelectedSchemeCode(scheme.code)}
-                            className="mt-1 text-[#1D0A69] focus:ring-[#1D0A69]"
-                          />
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="font-bold text-[#1D0A69] text-sm font-serif">
-                                {language === 'hi' ? scheme.titleHi : scheme.titleEn}
-                              </span>
-                              <span className="text-xs font-mono font-bold bg-[#EBEAEA] text-[#1D0A69] px-2 py-0.5 rounded">
-                                {scheme.officialCode}
-                              </span>
+                  {/* ST Certificate Reuse Prompt (Requirement 14, 16) */}
+                  {reusableFields['caste_certificate_number'] && !casteReusePromptDismissed && (
+                    <div className="bg-[#FFF8E1] border border-[#FFE082] p-4 rounded-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <Sparkles className="w-5 h-5 text-[#F57F17] flex-shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-xs font-bold text-[#7A5E00]">
+                              Use Information from Your Saved Document?
                             </div>
-                            <p className="text-[#546E7A] text-xs mt-1">
-                              {scheme.targetGroupEn}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-4 mt-2 text-[11px] text-[#263238] font-medium">
-                              <span>Ceiling: <strong>{scheme.incomeCeilingEn}</strong></span>
-                              <span>•</span>
-                              <span>Allocation: <strong>₹{scheme.annualBudgetCr} Cr</strong></span>
-                              <span>•</span>
-                              <span className="text-[#198754]">Target: <strong>{scheme.totalBeneficiariesTarget} Scholars</strong></span>
+                            <div className="text-xs text-[#5D4037] mt-0.5">
+                              Saved ST Certificate Number: <strong>{reusableFields['caste_certificate_number'].value}</strong>
+                            </div>
+                            <div className="text-[10px] text-[#7A5E00] mt-1 font-medium">
+                              Source: {reusableFields['caste_certificate_number'].source_document_name || 'ST Community Certificate'}
                             </div>
                           </div>
                         </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
-            {/* STEP 4: BANK & DBT */}
-            {currentStep === 4 && (
-              <div className="space-y-6 text-xs">
-                <div className="bg-[#E8F5E9] border border-[#A5D6A7] p-4 rounded-md space-y-2 text-[#1B5E20]">
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <ShieldCheck className="w-5 h-5 text-[#198754]" />
-                    <span>NPCI Direct Benefit Transfer (DBT) Status: ACTIVE & VERIFIED</span>
-                  </div>
-                  <p className="text-xs leading-relaxed">
-                    Under the direct mandate of the Ministry of Tribal Affairs, scholarship stipends and fee reimbursements are transferred solely to active Aadhaar-seeded accounts mapped on the NPCI gateway. Zero manual cheque or third-party transfers are permitted.
-                  </p>
-                </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={applyCasteFromVault}
+                            className="bg-[#1D0A69] text-white hover:bg-[#15074D] px-3 py-1.5 rounded text-xs font-bold shadow-xs"
+                          >
+                            Use This Information
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCasteReusePromptDismissed(true)}
+                            className="text-xs text-[#546E7A] hover:underline"
+                          >
+                            Enter Manually
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="gov-label text-xs">Seeded Bank Name</label>
-                    <input type="text" className="gov-input text-xs bg-[#F4F6F8] font-bold text-[#150202]" value="Bank of India" readOnly />
-                  </div>
-                  <div>
-                    <label className="gov-label text-xs">Masked Account Number (NPCI Mapped)</label>
-                    <input type="text" className="gov-input text-xs font-mono bg-[#F4F6F8] font-bold text-[#1D0A69]" value="•••• •••• •••• 4912" readOnly />
+                    <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                      ST Community Certificate Number
+                    </label>
+                    <input
+                      type="text"
+                      value={casteCertNo}
+                      onChange={(e) => {
+                        setCasteCertNo(e.target.value);
+                        setUsedVaultSources(prev => ({ ...prev, caste_certificate_number: 'Manually Entered' }));
+                      }}
+                      placeholder="e.g. JH/ST/2024/77491"
+                      className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                    />
+                    {usedVaultSources['caste_certificate_number'] && (
+                      <span className="text-[10px] text-[#2E7D32] font-semibold mt-1 flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        <span>{usedVaultSources['caste_certificate_number']}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="gov-label text-xs">Bank IFSC Code</label>
-                    <input type="text" className="gov-input text-xs font-mono bg-[#F4F6F8]" value="BKID0004912" readOnly />
-                  </div>
-                  <div>
-                    <label className="gov-label text-xs">PFMS Public Gateway Status</label>
-                    <input type="text" className="gov-input text-xs text-[#198754] font-bold bg-[#F4F6F8]" value="VALIDATED (Beneficiary Matched)" readOnly />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 5: DOCUMENT INGESTION & OCR PIPELINE */}
-            {currentStep === 5 && (
-              <div className="space-y-6 text-xs">
-                <div className="border-b border-[#ECEFF1] pb-3">
-                  <h3 className="text-base font-bold text-[#1D0A69] font-serif">
-                    Evidentiary Documents & Real-Time Integrity Scan
-                  </h3>
-                  <p className="text-[#546E7A] text-xs mt-0.5">
-                    Uploaded evidence is quarantined in memory, scanned via ClamAV, hashed with SHA-256, and provisionally extracted with PaddleOCR.
-                  </p>
-                </div>
-
+              {/* ─────────────────────────────────────────────────────────────
+                  STEP 2: ACADEMIC DETAILS
+                  ───────────────────────────────────────────────────────────── */}
+              {currentStep === 2 && (
                 <div className="space-y-4">
-                  {/* DEMO PROMINENT CTA TO STEP 4 (OCR) */}
-                  <div className="bg-[#1D0A69] text-white p-4 rounded-md border-2 border-[#FFC107] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                  <div>
+                    <h3 className="text-base font-bold text-[#1D0A69]">
+                      2. Academic Enrolment & Institution Information
+                    </h3>
+                    <p className="text-xs text-[#546E7A]">
+                      Select your eligible notified institution and approved course of study.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                        Notified Institution / University (AISHE List)
+                      </label>
+                      <input
+                        type="text"
+                        value={institutionName}
+                        onChange={(e) => setInstitutionName(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
+                    </div>
                     <div>
-                      <div className="flex items-center gap-2 font-bold text-sm text-[#FFC107]">
-                        <Sparkles className="w-4 h-4" />
-                        <span>Live ClamAV Security & Multi-Lingual PaddleOCR Engine</span>
-                      </div>
-                      <p className="text-xs text-white/80 mt-1">
-                        Experience the complete automated ingestion pipeline with synthetic revenue income certificate (Mandla, MP).
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDemoStep('upload_ocr')}
-                      className="bg-[#FFC107] hover:bg-[#FFA000] text-[#1D0A69] font-extrabold px-4 py-2.5 rounded text-xs flex items-center gap-2 shadow-md whitespace-nowrap self-start sm:self-auto transition-colors"
-                    >
-                      <UploadCloud className="w-4 h-4" />
-                      <span>Launch Ingestion & OCR Pipeline →</span>
-                    </button>
-                  </div>
-
-                  {/* Document 1: ST Caste Certificate */}
-                  <div className="p-4 border border-[#CFD8DC] rounded-md bg-white space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <FileCheck2 className="w-5 h-5 text-[#198754]" />
-                        <strong className="text-xs text-[#150202]">1. Scheduled Tribe (ST) Community Certificate</strong>
-                      </div>
-                      <span className="bg-[#E8F5E9] text-[#198754] text-[11px] font-bold px-2 py-0.5 rounded border border-[#A5D6A7]">
-                        ✓ OCR Extracted & Verified
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-[#546E7A] flex flex-wrap items-center justify-between gap-2 bg-[#F8F9FA] p-2 rounded">
-                      <span>File: <code>MP_ST_CERT_MANDLA.pdf</code> (SHA-256: <code>8f14b...091e</code>)</span>
-                      <span className="text-[#198754] font-bold">ClamAV Clean</span>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                        AISHE Code
+                      </label>
+                      <input
+                        type="text"
+                        value={aisheCode}
+                        onChange={(e) => setAisheCode(e.target.value)}
+                        placeholder="e.g. U-0570"
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white font-mono"
+                      />
                     </div>
                   </div>
+                  <span className="text-[10px] text-[#2E7D32] font-semibold -mt-2 block">
+                    ✓ AISHE Verified Institution: Top Class Education Eligible
+                  </span>
 
-                  {/* Document 2: Current FY Income Certificate */}
-                  <div className="p-4 border border-[#CFD8DC] rounded-md bg-white space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-[#1D0A69]" />
-                        <strong className="text-xs text-[#150202]">2. Current FY Family Income Certificate (Rule 4.2)</strong>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setDemoStep('upload_ocr')}
-                        className="bg-[#1D0A69] hover:bg-[#15074D] text-[#FFC107] text-[11px] font-bold py-1 px-3 rounded flex items-center gap-1.5"
-                      >
-                        <UploadCloud className="w-3.5 h-3.5" />
-                        <span>Inspect in OCR Console</span>
-                      </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Course of Study</label>
+                      <input
+                        type="text"
+                        value={courseName}
+                        onChange={(e) => setCourseName(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
                     </div>
-                    <p className="text-[11px] text-[#546E7A]">
-                      Issued on 15-January-2026 by Tehsildar, Mandla (M.P.). Provisional extraction: ₹4,50,000.
-                    </p>
-                  </div>
 
-                  {/* Document 3: Bonafide Certificate */}
-                  <div className="p-4 border border-[#CFD8DC] rounded-md bg-white space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <FileCheck2 className="w-5 h-5 text-[#198754]" />
-                        <strong className="text-xs text-[#150202]">3. Institution Bonafide Student Certificate</strong>
-                      </div>
-                      <span className="bg-[#E8F5E9] text-[#198754] text-[11px] font-bold px-2 py-0.5 rounded border border-[#A5D6A7]">
-                        ✓ Institute Sealed
-                      </span>
+                    <div>
+                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Admission Cycle</label>
+                      <input
+                        type="text"
+                        value={admissionYear}
+                        onChange={(e) => setAdmissionYear(e.target.value)}
+                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                      />
                     </div>
-                    <p className="text-[11px] text-[#546E7A]">
-                      Signed by Dean of Academic Affairs, Synthetic Demo University (IIT Indore).
-                    </p>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* STEP 6: REVIEW & STATUTORY SUBMISSION */}
-            {currentStep === 6 && (
-              <div className="space-y-6 text-xs">
-                <div className="border border-[#CFD8DC] rounded-md overflow-hidden">
-                  <div className="bg-[#1D0A69] text-white px-4 py-2 font-bold font-serif text-sm flex items-center justify-between">
-                    <span>Final Application Dossier Summary</span>
-                    <span className="bg-[#FFC107] text-[#1D0A69] font-bold px-2 py-0.5 rounded text-xs">
-                      Mandla ST Synthetic Scenario
+              {/* ─────────────────────────────────────────────────────────────
+                  STEP 3: FINANCIAL & INCOME DETAILS (REUSE SCENARIO)
+                  ───────────────────────────────────────────────────────────── */}
+              {currentStep === 3 && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-base font-bold text-[#1D0A69]">
+                      3. Financial Parameters & Parental Income Declaration
+                    </h3>
+                    <p className="text-xs text-[#546E7A]">
+                      State the gross parental family income as per competent revenue authority certificate.
+                    </p>
+                  </div>
+
+                  {/* SAVED INFORMATION PROMPT (Requirement 14 & 28) */}
+                  {reusableFields['annual_family_income'] && !incomeReusePromptDismissed && (
+                    <div className="bg-[#FFF8E1] border border-[#FFE082] p-4 rounded-xl shadow-xs">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <Sparkles className="w-5 h-5 text-[#F57F17] flex-shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-xs font-bold text-[#7A5E00]">
+                              Use Information from Your Saved Documents
+                            </div>
+                            <div className="text-sm font-bold text-[#150202] mt-0.5">
+                              Annual Family Income: {reusableFields['annual_family_income'].display_value}
+                            </div>
+                            <div className="text-[11px] text-[#5D4037] mt-0.5">
+                              Saved from: <strong>{reusableFields['annual_family_income'].source_document_name || 'Income Certificate'}</strong>
+                            </div>
+                            <div className="text-[10px] text-[#7A5E00] mt-1">
+                              Status: Provisional document extraction. You may review and modify below.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={applyIncomeFromVault}
+                            className="bg-[#1D0A69] text-white hover:bg-[#15074D] px-3.5 py-1.5 rounded text-xs font-bold shadow-xs"
+                          >
+                            Use This Information
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIncomeReusePromptDismissed(true)}
+                            className="text-xs text-[#546E7A] hover:underline"
+                          >
+                            Enter Manually
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                      Gross Annual Parental / Family Income (INR) *
+                    </label>
+                    <input
+                      type="number"
+                      value={annualIncome}
+                      onChange={(e) => {
+                        setAnnualIncome(e.target.value);
+                        setUsedVaultSources(prev => ({ ...prev, annual_family_income: 'Manually Entered by Applicant' }));
+                      }}
+                      className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white font-mono font-bold"
+                    />
+
+                    {/* Source Indicator (Requirement 16) */}
+                    {usedVaultSources['annual_family_income'] ? (
+                      <div className="text-[11px] text-[#2E7D32] font-semibold mt-1 flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-[#2E7D32]" />
+                        <span>Source: {usedVaultSources['annual_family_income']}</span>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-[#78909C] mt-1">
+                        Source: Applicant Self-Declaration
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                      Income Certificate Number
+                    </label>
+                    <input
+                      type="text"
+                      value={incomeCertNo}
+                      onChange={(e) => setIncomeCertNo(e.target.value)}
+                      placeholder="e.g. REV/INC/2026/8849"
+                      className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                    />
+                  </div>
+
+                  <div className="bg-[#E8F5E9] p-3.5 rounded-lg border border-[#A5D6A7] text-xs text-[#1B5E20] flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 flex-shrink-0 text-[#2E7D32]" />
+                    <span>
+                      Direct Benefit Transfer (DBT): Stipends will be credited directly to your Aadhaar-seeded Bank Account (••••4912).
                     </span>
                   </div>
-                  <div className="divide-y divide-[#ECEFF1] p-2 bg-[#FAFAFA]">
-                    <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">Applicant Name</span>
-                      <span className="col-span-2 text-[#150202] font-bold">{fullName} (OTR-2026-ST-884912)</span>
+                </div>
+              )}
+
+              {/* ─────────────────────────────────────────────────────────────
+                  STEP 4: DOCUMENT VAULT LINKING
+                  ───────────────────────────────────────────────────────────── */}
+              {currentStep === 4 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-[#1D0A69]">
+                        4. Link Documents from My Document Vault
+                      </h3>
+                      <p className="text-xs text-[#546E7A]">
+                        Reuse your previously verified certificates without re-uploading.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">Target Scheme</span>
-                      <span className="col-span-2 text-[#1D0A69] font-bold">Top Class Education for ST Students (TOP-05)</span>
-                    </div>
-                    <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">Institution</span>
-                      <span className="col-span-2 text-[#150202]">{institutionName} (AISHE: {aisheCode})</span>
-                    </div>
-                    <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">Degree / Course</span>
-                      <span className="col-span-2 text-[#150202]">{courseName}</span>
-                    </div>
-                    <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">Declared Annual Income</span>
-                      <span className="col-span-2 text-[#150202] font-mono font-bold">₹{Number(annualIncome).toLocaleString('en-IN')} (Self-Declared)</span>
-                    </div>
-                    <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">DBT Remittance Bank</span>
-                      <span className="col-span-2 text-[#198754] font-bold">State Bank of India (Aadhaar Seeded ••••4912)</span>
-                    </div>
+
+                    <Link
+                      to="/documents"
+                      target="_blank"
+                      className="text-xs text-[#1D0A69] hover:underline font-bold flex items-center gap-1"
+                    >
+                      <FolderLock className="w-3.5 h-3.5" />
+                      <span>Manage Vault</span>
+                    </Link>
+                  </div>
+
+                  <div className="space-y-3">
+                    {vaultDocuments.length === 0 ? (
+                      <div className="p-6 bg-[#F8F9FA] rounded-xl border border-dashed border-[#CFD8DC] text-center">
+                        <FolderLock className="w-8 h-8 text-[#78909C] mx-auto mb-2" />
+                        <p className="text-xs font-bold text-[#1D0A69]">No documents in your vault yet</p>
+                        <p className="text-[11px] text-[#546E7A] mt-1">
+                          You can upload your certificates directly to your vault so they are automatically reused for all future schemes.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/documents')}
+                          className="mt-3 bg-[#1D0A69] text-white px-4 py-1.5 rounded text-xs font-bold"
+                        >
+                          Upload to Vault
+                        </button>
+                      </div>
+                    ) : (
+                      vaultDocuments.map((doc) => (
+                        <div 
+                          key={doc.id}
+                          className="bg-[#FAFAFA] border border-[#CFD8DC] rounded-lg p-3 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded bg-[#E8EAF6] text-[#1D0A69] flex items-center justify-center font-bold">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-[#1D0A69]">{doc.display_type}</div>
+                              <div className="text-[11px] text-[#78909C]">{doc.original_filename}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded">
+                              ✓ ClamAV Clean
+                            </span>
+                            <span className="text-[10px] font-bold text-[#F57F17] bg-[#FFF8E1] px-2 py-0.5 rounded">
+                              {doc.verification_status}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (applicationId) {
+                                  await vaultApi.linkDocument(doc.id, applicationId);
+                                  setSaveSuccessMsg(`Linked ${doc.display_type} to this application.`);
+                                  setTimeout(() => setSaveSuccessMsg(null), 2500);
+                                }
+                              }}
+                              className="bg-white border border-[#CFD8DC] hover:border-[#1D0A69] text-[#1D0A69] font-bold px-2.5 py-1 rounded text-[11px]"
+                            >
+                              Link to Dossier
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
+              )}
 
-                <div className="p-4 rounded border border-[#FFE082] bg-[#FFF9C4] text-[#5D4037] space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-xs text-[#7A5E00]">
-                    <AlertCircle className="w-4 h-4 text-[#C85A17]" />
-                    <span>Statutory Legal Affirmation (IT Act 2000 & Article 342)</span>
+              {/* ─────────────────────────────────────────────────────────────
+                  STEP 5: REVIEW & FINAL SUBMISSION
+                  ───────────────────────────────────────────────────────────── */}
+              {currentStep === 5 && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-base font-bold text-[#1D0A69]">
+                      5. Review Dossier & Final Statutory Affirmation
+                    </h3>
+                    <p className="text-xs text-[#546E7A]">
+                      Review all declared and saved document parameters before formal submission.
+                    </p>
                   </div>
-                  <p className="text-[11px] leading-relaxed">
-                    I solemnly declare that all particulars and documents submitted herein are genuine. I understand that misrepresentation of caste status or income parameters will lead to immediate cancellation of scholarship, recovery of disbursed funds with penal interest, and prosecution under Indian Penal Code provisions.
-                  </p>
+
+                  <div className="border border-[#CFD8DC] rounded-xl overflow-hidden divide-y divide-[#ECEFF1] text-xs">
+                    <div className="bg-[#1D0A69] text-white px-4 py-2 font-bold flex items-center justify-between">
+                      <span>Application #{applicationNumber}</span>
+                      <span className="bg-[#FFC107] text-[#120538] font-bold px-2 py-0.5 rounded text-[10px]">
+                        Ready for Submission
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 p-3 bg-white">
+                      <span className="font-semibold text-[#546E7A]">Target Scheme</span>
+                      <span className="col-span-2 font-bold text-[#1D0A69]">{selectedScheme.titleEn}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 p-3 bg-[#F8F9FA]">
+                      <span className="font-semibold text-[#546E7A]">Applicant</span>
+                      <span className="col-span-2 font-bold text-[#263238]">{fullName} ({community})</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 p-3 bg-white">
+                      <span className="font-semibold text-[#546E7A]">Institution & Course</span>
+                      <span className="col-span-2 text-[#263238]">{institutionName} — {courseName}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 p-3 bg-[#F8F9FA]">
+                      <span className="font-semibold text-[#546E7A]">Declared Annual Income</span>
+                      <span className="col-span-2 font-mono font-bold text-[#1D0A69]">
+                        ₹{Number(annualIncome).toLocaleString('en-IN')}
+                        {usedVaultSources['annual_family_income'] && (
+                          <span className="text-[10px] text-[#2E7D32] ml-2 font-normal">
+                            ({usedVaultSources['annual_family_income']})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-[#FFE082] bg-[#FFF9C4] text-[#5D4037] text-xs space-y-1.5">
+                    <div className="flex items-center gap-2 font-bold text-[#7A5E00]">
+                      <AlertCircle className="w-4 h-4 text-[#C85A17]" />
+                      <span>Statutory Undertaking (IT Act 2000 & MoTA Directives)</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">
+                      I solemnly affirm that the information declared above and documents linked from my vault are true and authentic. I authorize the scrutiny officer and competent authority to verify records against issuing authority registers.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-          </div>
+            </div>
 
-          {/* Bottom Wizard Navigation Action Ribbon */}
-          <div className="p-4 sm:p-6 bg-[#F8F9FA] border-t border-[#CFD8DC] flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {currentStep > 1 && (
+            {/* Bottom Wizard Actions */}
+            <div className="p-4 sm:p-6 bg-[#F8F9FA] border-t border-[#CFD8DC] flex items-center justify-between">
+              {currentStep > 1 ? (
                 <button
                   type="button"
                   onClick={() => setCurrentStep(currentStep - 1)}
-                  className="gov-btn gov-btn-secondary text-xs flex items-center gap-1.5 font-bold"
+                  className="px-4 py-2 border border-[#CFD8DC] bg-white rounded font-bold text-xs text-[#546E7A] hover:bg-[#ECEFF1] flex items-center gap-1.5"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Previous</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                className="px-3 py-2 bg-white border border-[#CFD8DC] hover:bg-gray-50 text-[#1D0A69] rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs"
-              >
-                <Save className="w-3.5 h-3.5 text-[#546E7A]" />
-                <span>Save Draft</span>
-              </button>
-            </div>
+              ) : <div></div>}
 
-            <div className="flex items-center gap-2">
-              {currentStep === 5 && (
-                <button
-                  type="button"
-                  onClick={() => setDemoStep('upload_ocr')}
-                  className="bg-[#1D0A69] hover:bg-[#15074D] text-[#FFC107] border border-[#C85A17] font-bold text-xs px-4 py-2.5 rounded shadow-sm flex items-center gap-1.5"
-                >
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Run Live OCR Pipeline</span>
-                </button>
-              )}
-
-              {currentStep < 6 ? (
+              {currentStep < 5 ? (
                 <button
                   type="button"
                   onClick={() => setCurrentStep(currentStep + 1)}
-                  className="gov-btn gov-btn-primary text-xs font-bold px-6 py-2.5 flex items-center gap-2"
+                  className="bg-[#1D0A69] hover:bg-[#15074D] text-white font-bold text-xs px-6 py-2.5 rounded shadow-sm flex items-center gap-2"
                 >
                   <span>Continue to Step {currentStep + 1}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    onSubmitted();
-                    setDemoStep('upload_ocr');
-                  }}
-                  className="bg-[#198754] hover:bg-[#157347] text-white font-bold text-xs px-8 py-3 rounded shadow-md flex items-center gap-2 transition-all"
+                  disabled={submitting}
+                  onClick={handleFinalSubmit}
+                  className="bg-[#198754] hover:bg-[#157347] disabled:opacity-50 text-white font-bold text-xs px-8 py-3 rounded shadow-md flex items-center gap-2"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Submit & Ingest Evidence</span>
+                  {submitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Submitting Application...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Submit Application Dossier</span>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               )}
             </div>
-          </div>
 
-        </div>
-      </main>
+          </div>
+        )}
+
+      </div>
+
     </div>
   );
 };

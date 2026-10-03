@@ -11,7 +11,10 @@ from apps.documents.views import (
     DocumentOCRResultView,
     DocumentClassificationView,
     DocumentExtractedFieldsView,
-    DocumentTriggerOCRView
+    DocumentTriggerOCRView,
+    DocumentVaultView,
+    DocumentVaultReusableFieldsView,
+    DocumentVaultLinkView,
 )
 from apps.schemes.views import (
     SchemeViewSet, SchemeVersionViewSet, SchemeRuleViewSet,
@@ -58,6 +61,12 @@ urlpatterns = [
     path('api/v1/schemes/<str:scheme_version_id>/application-form/', SchemeApplicationFormView.as_view(), name='scheme-application-form-str'),
     path('api/v1/applications/<uuid:application_id>/documents/', ApplicationDocumentUploadView.as_view(), name='application-document-upload'),
     path('api/v1/applications/<str:application_id>/documents/', ApplicationDocumentUploadView.as_view(), name='application-document-upload-str'),
+    path('api/v1/documents/vault/reusable-fields/', DocumentVaultReusableFieldsView.as_view(), name='document-vault-reusable-fields'),
+    path('api/v1/documents/vault/reusable-fields', DocumentVaultReusableFieldsView.as_view(), name='document-vault-reusable-fields-noslash'),
+    path('api/v1/documents/vault/<uuid:document_id>/link/<uuid:application_id>/', DocumentVaultLinkView.as_view(), name='document-vault-link'),
+    path('api/v1/documents/vault/<str:document_id>/link/<str:application_id>/', DocumentVaultLinkView.as_view(), name='document-vault-link-str'),
+    path('api/v1/documents/vault/', DocumentVaultView.as_view(), name='document-vault'),
+    path('api/v1/documents/vault', DocumentVaultView.as_view(), name='document-vault-noslash'),
     path('api/v1/documents/<uuid:document_id>/download/', DocumentDownloadView.as_view(), name='document-download'),
     path('api/v1/documents/<str:document_id>/download/', DocumentDownloadView.as_view(), name='document-download-str'),
     path('api/v1/documents/<uuid:document_id>/ocr-status/', DocumentOCRStatusView.as_view(), name='document-ocr-status'),
@@ -73,6 +82,7 @@ urlpatterns = [
     path('api/v1/documents/<uuid:document_id>/', DocumentDetailView.as_view(), name='document-detail'),
     path('api/v1/documents/<str:document_id>/', DocumentDetailView.as_view(), name='document-detail-str'),
     path('api/v1/auth/', include('apps.accounts.urls')),
+    path('api/v1/applicants/', include('apps.applicants.urls')),
     path('api/v1/verification/', include('apps.verification.urls')),
     path('api/v1/', include(router.urls)),
     path('api/v1/integrations/status/', IntegrationStatusView.as_view(), name='integration-status'),

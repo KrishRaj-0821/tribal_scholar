@@ -1,310 +1,376 @@
-import React, { useState, useEffect } from 'react';
-import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { LanguageProvider } from './context/LanguageContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
-import { DemoProvider, useDemo, DemoStep } from './context/DemoContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { DemoProvider } from './context/DemoContext';
 import { AccessibilityToolbar } from './components/common/AccessibilityToolbar';
-import { PitchWalkthroughBar } from './components/common/PitchWalkthroughBar';
 import { GovernmentHeader } from './components/common/GovernmentHeader';
 import { GovernmentFooter } from './components/common/GovernmentFooter';
-import { MobileBottomNav } from './components/common/MobileBottomNav';
+import { PortalNavigationBar } from './components/common/PortalNavigationBar';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { PwaOfflineBanner } from './components/common/PwaOfflineBanner';
+
+// Views
 import { HomeView } from './components/views/HomeView';
 import { SchemeExplorerView } from './components/views/SchemeExplorerView';
 import { SchemeDetailView } from './components/views/SchemeDetailView';
 import { LoginView } from './components/views/LoginView';
 import { RegistrationView } from './components/views/RegistrationView';
 import { ApplicantDashboardView } from './components/views/ApplicantDashboardView';
+import { ApplicantProfileView } from './components/views/ApplicantProfileView';
+import { DocumentVaultView } from './components/views/DocumentVaultView';
 import { ApplicationWizardView } from './components/views/ApplicationWizardView';
-import { DocumentUploadOcrView } from './components/views/DocumentUploadOcrView';
+import { ApplicantStatusView } from './components/views/ApplicantStatusView';
 import { DeficiencyResolutionView } from './components/views/DeficiencyResolutionView';
 import { GrievanceView } from './components/views/GrievanceView';
 import { OfficerDashboardView } from './components/views/OfficerDashboardView';
 import { VerificationWorkbenchView } from './components/views/VerificationWorkbenchView';
-import { ApplicantStatusView } from './components/views/ApplicantStatusView';
 import { AdminDashboardView } from './components/views/AdminDashboardView';
-import { PwaOfflineBanner } from './components/common/PwaOfflineBanner';
+import { HelpView } from './components/views/HelpView';
+import { AboutView } from './components/views/AboutView';
+
 import { SchemeInfo, OFFICIAL_MOTA_SCHEMES } from './theme/tokens';
-import { 
-  Home, Compass, FileSpreadsheet, ShieldCheck, 
-  Settings, MessageSquareWarning, LogIn 
-} from 'lucide-react';
 
-export type PortalTab = 
-  | 'home' 
-  | 'schemes' 
-  | 'scheme_detail' 
-  | 'login' 
-  | 'register' 
-  | 'dashboard' 
-  | 'wizard' 
-  | 'upload_ocr'
-  | 'applicant_status'
-  | 'deficiency' 
-  | 'grievance' 
-  | 'officer' 
-  | 'workbench' 
-  | 'admin';
-
-const MainPortalContent: React.FC = () => {
-  const { language } = useLanguage();
-  const { currentStep, setCurrentStep } = useDemo();
-  const [activeTab, setActiveTab] = useState<PortalTab>('home');
-  const [selectedScheme, setSelectedScheme] = useState<SchemeInfo | null>(OFFICIAL_MOTA_SCHEMES[2]); // Default Top Class
-
-  // Sync with SIH Pitch Demo Stepper
-  useEffect(() => {
-    if (currentStep === 'officer_queue') {
-      setActiveTab('officer');
-    } else {
-      setActiveTab(currentStep as PortalTab);
-    }
-  }, [currentStep]);
+// Scheme Explorer Wrapper
+const SchemeExplorerPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const handleSelectScheme = (scheme: SchemeInfo) => {
-    setSelectedScheme(scheme);
-    setActiveTab('scheme_detail');
+    navigate(`/schemes/${scheme.code}`);
   };
 
   const handleApplyScheme = (scheme: SchemeInfo) => {
-    setSelectedScheme(scheme);
-    setActiveTab('wizard');
-    setCurrentStep('wizard');
-  };
-
-  const handleTabNavigate = (t: PortalTab) => {
-    setActiveTab(t);
-    if (t === 'home' || t === 'schemes' || t === 'wizard' || t === 'upload_ocr' || t === 'workbench' || t === 'applicant_status') {
-      setCurrentStep(t as DemoStep);
-    } else if (t === 'officer') {
-      setCurrentStep('officer_queue');
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=/applications/new?scheme=${scheme.code}`);
+    } else {
+      navigate(`/applications/new?scheme=${scheme.code}`);
     }
   };
+
+  return (
+    <SchemeExplorerView
+      onSelectScheme={handleSelectScheme}
+      onApplyScheme={handleApplyScheme}
+    />
+  );
+};
+
+// Scheme Detail Wrapper
+const SchemeDetailPage: React.FC = () => {
+  const { schemeId } = useParams<{ schemeId: string }>();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const scheme = OFFICIAL_MOTA_SCHEMES.find(
+    s => s.code.toLowerCase() === schemeId?.toLowerCase() || s.officialCode.toLowerCase() === schemeId?.toLowerCase()
+  ) || OFFICIAL_MOTA_SCHEMES[2]; // Default Top Class
+
+  const handleApply = (sch: SchemeInfo) => {
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=/applications/new?scheme=${sch.code}`);
+    } else {
+      navigate(`/applications/new?scheme=${sch.code}`);
+    }
+  };
+
+  return (
+    <SchemeDetailView
+      scheme={scheme}
+      onBack={() => navigate('/schemes')}
+      onApply={handleApply}
+    />
+  );
+};
+
+// Application Wizard Wrapper
+const ApplicationWizardPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const schemeCode = searchParams.get('scheme');
+
+  const initialScheme = OFFICIAL_MOTA_SCHEMES.find(
+    s => s.code.toLowerCase() === schemeCode?.toLowerCase()
+  ) || OFFICIAL_MOTA_SCHEMES[2];
+
+  return (
+    <ApplicationWizardView
+      initialScheme={initialScheme}
+      onSubmitted={() => navigate('/dashboard')}
+      onCancel={() => navigate('/schemes')}
+    />
+  );
+};
+
+// Verification Workbench Wrapper
+const VerificationWorkbenchPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  return (
+    <VerificationWorkbenchView
+      applicationId={id || 'APP-2026-001DB3'}
+      onBackToQueue={() => navigate('/officer')}
+    />
+  );
+};
+
+// Home View Wrapper
+const HomePage: React.FC = () => {
+  const navigate = useNavigate();
+
+  return (
+    <HomeView
+      onSelectScheme={(scheme) => navigate(`/schemes/${scheme.code}`)}
+      onNavigateTab={(tab) => {
+        if (tab === 'schemes') navigate('/schemes');
+        else if (tab === 'dashboard') navigate('/dashboard');
+        else if (tab === 'login') navigate('/login');
+        else if (tab === 'grievance') navigate('/grievance');
+        else navigate('/');
+      }}
+    />
+  );
+};
+
+// App Layout with statutory Government Header, Nav, and Footer
+const AppLayout: React.FC = () => {
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F6F8]">
       {/* 0. PWA Offline & Install Indicators */}
       <PwaOfflineBanner />
 
-      {/* 1. Top GIGW 3.0 Accessibility Toolbar */}
+      {/* 1. GIGW 3.0 Accessibility Toolbar */}
       <AccessibilityToolbar />
-
-      {/* 1.5 SIH 2026 Interactive Pitch Demonstration Stepper Ribbon */}
-      <PitchWalkthroughBar />
 
       {/* 2. Official Ministry of Tribal Affairs Sovereign Header */}
       <GovernmentHeader />
 
-      {/* 3. Primary Sovereign Navigation Bar (Desktop) */}
-      <nav 
-        className="hidden md:block bg-[#1D0A69] text-white select-none border-b border-[#0F4C81] sticky top-0 z-40 shadow-sm"
-        role="navigation"
-        aria-label="Primary Portal Navigation"
-      >
-        <div className="gov-container flex items-center justify-between">
-          <div className="flex items-center gap-1 overflow-x-auto text-xs font-bold">
-            <button
-              onClick={() => handleTabNavigate('home')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'home'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <Home className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'मुख्य पृष्ठ' : 'Home'}</span>
-            </button>
+      {/* 3. Authoritative Portal Navigation Bar */}
+      <PortalNavigationBar />
 
-            <button
-              onClick={() => handleTabNavigate('schemes')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'schemes' || activeTab === 'scheme_detail'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'योजनाएं (5 Schemes)' : 'All Schemes'}</span>
-            </button>
-
-            <button
-              onClick={() => handleTabNavigate('dashboard')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'dashboard' || activeTab === 'deficiency'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'आवेदक डैशबोर्ड' : 'Applicant Dashboard'}</span>
-              <span className="w-2 h-2 rounded-full bg-[#FFC107]"></span>
-            </button>
-
-            <button
-              onClick={() => handleTabNavigate('wizard')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'wizard'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <span>{language === 'hi' ? 'ऑनलाइन आवेदन (Apply)' : 'Apply Online'}</span>
-            </button>
-
-            <button
-              onClick={() => handleTabNavigate('officer')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'officer' || activeTab === 'workbench'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'जांच कार्यक्षेत्र (Officer)' : 'Officer Workbench'}</span>
-            </button>
-
-            <button
-              onClick={() => handleTabNavigate('admin')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'admin'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'केंद्रीय प्रशासन' : 'Central Admin'}</span>
-            </button>
-
-            <button
-              onClick={() => handleTabNavigate('grievance')}
-              className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
-                activeTab === 'grievance'
-                  ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
-                  : 'border-transparent text-[#FFFFFF] hover:text-[#FFC107] hover:bg-[#15074D]'
-              }`}
-            >
-              <MessageSquareWarning className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'शिकायत निवारण' : 'Grievance / CPGRAMS'}</span>
-            </button>
-          </div>
-
-          {/* Right Action: Login / OTR */}
-          <button
-            onClick={() => handleTabNavigate('login')}
-            className={`flex items-center gap-1.5 py-1 px-3 rounded text-xs font-bold border transition-colors ${
-              activeTab === 'login' || activeTab === 'register'
-                ? 'bg-[#FFC107] text-[#150202] border-[#FFC107]'
-                : 'border-[#546E7A] text-white hover:bg-[#15074D]'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>{language === 'hi' ? 'नागरिक प्रवेश' : 'Citizen Login / OTR'}</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* 4. Main Page View Content */}
+      {/* 4. Sovereign Main Routed View Content */}
       <main id="main-content" className="flex-1" role="main">
-        {activeTab === 'home' && (
-          <HomeView
-            onSelectScheme={handleSelectScheme}
-            onNavigateTab={(t) => setActiveTab(t as any)}
+        <Routes>
+          {/* ========================================================
+              PUBLIC ROUTES (Requirement 3: Never require auth)
+              ======================================================== */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/schemes" element={<SchemeExplorerPage />} />
+          <Route path="/schemes/:schemeId" element={<SchemeDetailPage />} />
+          <Route path="/login" element={<LoginView />} />
+          <Route path="/register" element={<RegistrationView />} />
+          <Route path="/help" element={<HelpView />} />
+          <Route path="/about" element={<AboutView />} />
+          <Route path="/grievance" element={<GrievanceView />} />
+
+          {/* ========================================================
+              APPLICANT PROTECTED ROUTES (Requirement 4 & 7)
+              Unauthenticated -> /login, Officer/Admin -> role dashboard
+              ======================================================== */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicantDashboardView 
+                  onResolveDeficiency={() => navigate('/deficiency')}
+                  onNavigateTab={(t) => navigate(`/${t}`)}
+                />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'schemes' && (
-          <SchemeExplorerView
-            onSelectScheme={handleSelectScheme}
-            onApplyScheme={handleApplyScheme}
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicantProfileView />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'scheme_detail' && selectedScheme && (
-          <SchemeDetailView
-            scheme={selectedScheme}
-            onBack={() => setActiveTab('schemes')}
-            onApply={handleApplyScheme}
+          <Route 
+            path="/documents" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <DocumentVaultView />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'login' && (
-          <LoginView
-            onLoginSuccess={(role) => {
-              if (role === 'applicant') {
-                setActiveTab('dashboard');
-              } else {
-                setActiveTab('officer');
-              }
-            }}
-            onNavigateRegister={() => setActiveTab('register')}
+          <Route 
+            path="/applications" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicantDashboardView 
+                  onResolveDeficiency={() => navigate('/deficiency')}
+                  onNavigateTab={(t) => navigate(`/${t}`)}
+                />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'register' && (
-          <RegistrationView
-            onBackToLogin={() => setActiveTab('login')}
-            onRegistered={() => setActiveTab('dashboard')}
+          <Route 
+            path="/applications/new" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicationWizardPage />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'dashboard' && (
-          <ApplicantDashboardView
-            onResolveDeficiency={() => setActiveTab('deficiency')}
-            onNavigateTab={(t) => setActiveTab(t as any)}
+          <Route 
+            path="/applications/:id/form" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicationWizardPage />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'wizard' && (
-          <ApplicationWizardView
-            initialScheme={selectedScheme}
-            onSubmitted={() => setActiveTab('dashboard')}
-            onCancel={() => setActiveTab('home')}
+          <Route 
+            path="/applications/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicantStatusView />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'upload_ocr' && (
-          <DocumentUploadOcrView />
-        )}
-
-        {activeTab === 'deficiency' && (
-          <DeficiencyResolutionView
-            onBack={() => setActiveTab('dashboard')}
-            onResolved={() => setActiveTab('dashboard')}
+          <Route 
+            path="/applications/:id/status" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicantStatusView />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'grievance' && (
-          <GrievanceView />
-        )}
-
-        {activeTab === 'officer' && (
-          <OfficerDashboardView
-            onOpenWorkbench={() => setActiveTab('workbench')}
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <ApplicantDashboardView />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'workbench' && (
-          <VerificationWorkbenchView
-            applicationId="APP-2026-001DB3"
-            onBackToQueue={() => setActiveTab('officer')}
+          <Route 
+            path="/grievance/my" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <GrievanceView />
+              </ProtectedRoute>
+            } 
           />
-        )}
 
-        {activeTab === 'applicant_status' && (
-          <ApplicantStatusView />
-        )}
+          <Route 
+            path="/deficiency" 
+            element={
+              <ProtectedRoute allowedRoles={['APPLICANT']}>
+                <DeficiencyResolutionView 
+                  onBack={() => navigate('/dashboard')}
+                  onResolved={() => navigate('/dashboard')}
+                />
+              </ProtectedRoute>
+            } 
+          />
 
-        {activeTab === 'admin' && (
-          <AdminDashboardView />
-        )}
+          {/* ========================================================
+              OFFICER PROTECTED ROUTES (Requirement 5 & 7)
+              Applicant -> /dashboard, Unauthenticated -> /login
+              ======================================================== */}
+          <Route 
+            path="/officer" 
+            element={
+              <ProtectedRoute allowedRoles={['SCRUTINY_OFFICER', 'VERIFYING_AUTHORITY', 'SANCTIONING_OFFICER', 'ADMIN']}>
+                <OfficerDashboardView 
+                  onOpenWorkbench={(appId) => navigate(`/officer/verification/${appId}`)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/officer/queue" 
+            element={
+              <ProtectedRoute allowedRoles={['SCRUTINY_OFFICER', 'VERIFYING_AUTHORITY', 'SANCTIONING_OFFICER', 'ADMIN']}>
+                <OfficerDashboardView 
+                  onOpenWorkbench={(appId) => navigate(`/officer/verification/${appId}`)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/officer/verification/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['SCRUTINY_OFFICER', 'VERIFYING_AUTHORITY', 'SANCTIONING_OFFICER', 'ADMIN']}>
+                <VerificationWorkbenchPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/officer/applications/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['SCRUTINY_OFFICER', 'VERIFYING_AUTHORITY', 'SANCTIONING_OFFICER', 'ADMIN']}>
+                <VerificationWorkbenchPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/officer/documents/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['SCRUTINY_OFFICER', 'VERIFYING_AUTHORITY', 'SANCTIONING_OFFICER', 'ADMIN']}>
+                <VerificationWorkbenchPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/officer/audit" 
+            element={
+              <ProtectedRoute allowedRoles={['SCRUTINY_OFFICER', 'VERIFYING_AUTHORITY', 'SANCTIONING_OFFICER', 'ADMIN']}>
+                <OfficerDashboardView 
+                  onOpenWorkbench={(appId) => navigate(`/officer/verification/${appId}`)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* ========================================================
+              ADMIN PROTECTED ROUTES (Requirement 6 & 7)
+              ======================================================== */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminDashboardView />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/admin/*" 
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminDashboardView />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Catch-all fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {/* 5. GIGW 3.0 Statutory Footer */}
       <GovernmentFooter />
-
-      {/* 6. PWA Mobile Bottom Navigation */}
-      <MobileBottomNav
-        activeTab={activeTab}
-        onSelectTab={(t) => handleTabNavigate(t as any)}
-      />
     </div>
   );
 };
@@ -313,9 +379,13 @@ export default function App() {
   return (
     <LanguageProvider>
       <AccessibilityProvider>
-        <DemoProvider>
-          <MainPortalContent />
-        </DemoProvider>
+        <AuthProvider>
+          <DemoProvider>
+            <BrowserRouter>
+              <AppLayout />
+            </BrowserRouter>
+          </DemoProvider>
+        </AuthProvider>
       </AccessibilityProvider>
     </LanguageProvider>
   );

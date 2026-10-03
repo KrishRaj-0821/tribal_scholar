@@ -1,275 +1,323 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { applicationApi, vaultApi, profileApi, VaultDocument } from '../../services/api';
 import { TribalPattern } from '../common/TribalPattern';
 import { 
-  ShieldCheck, AlertTriangle, ArrowRight, 
-  CheckCircle2, Clock, Download 
+  ShieldCheck, ArrowRight, CheckCircle2, 
+  Clock, FolderLock, PlusCircle, FileText, 
+  RefreshCw, ExternalLink
 } from 'lucide-react';
 
 interface ApplicantDashboardViewProps {
-  onResolveDeficiency: () => void;
+  onResolveDeficiency?: () => void;
   onNavigateTab?: (tab: string) => void;
 }
 
-export const ApplicantDashboardView: React.FC<ApplicantDashboardViewProps> = ({
-  onResolveDeficiency
-}) => {
+export const ApplicantDashboardView: React.FC<ApplicantDashboardViewProps> = () => {
   const { language } = useLanguage();
+  const { user } = useAuth();
+
+  const [applications, setApplications] = useState<any[]>([]);
+  const [vaultDocs, setVaultDocs] = useState<VaultDocument[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        const [appsRes, docsRes, profRes] = await Promise.allSettled([
+          applicationApi.list(),
+          vaultApi.getDocuments(),
+          profileApi.getProfile()
+        ]);
+
+        if (appsRes.status === 'fulfilled') {
+          const appsData = appsRes.value;
+          setApplications(Array.isArray(appsData) ? appsData : appsData?.results || []);
+        }
+        if (docsRes.status === 'fulfilled') {
+          setVaultDocs(docsRes.value?.documents || []);
+        }
+        if (profRes.status === 'fulfilled') {
+          setProfile(profRes.value);
+        }
+      } catch (e) {
+        console.error('Failed to load dashboard data', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, []);
+
+  const completionPct = profile?.completion_percentage || 85;
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ─────────────────────────────────────────────────────────────
-          01. EDITORIAL DASHBOARD HERO WITH SUBTLE CULTURAL WATERMARK
-          ───────────────────────────────────────────────────────────── */}
-      <section className="relative bg-[#FFFFFF] border-b border-[#CFD8DC] py-8 sm:py-10 overflow-hidden">
-        <TribalPattern variant="woven" asBackground opacity={0.06} color="#1D0A69" />
+    <div className="space-y-6 pb-12 bg-[#F4F6F8] min-h-screen">
+      
+      {/* 1. Header Hero with Sovereign Theme */}
+      <section className="relative bg-[#FFFFFF] border-b border-[#CFD8DC] py-8 overflow-hidden">
+        <TribalPattern family="woven" opacity={0.06} color="#1D0A69" className="absolute inset-0 pointer-events-none" />
 
         <div className="gov-container relative z-10 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs text-[#546E7A] font-mono">
-                <span>OTR: <strong>OTR-2026-ST-884912</strong></span>
+                <span>OTR: <strong>OTR-2026-ST-{user?.username?.toUpperCase() || '774912'}</strong></span>
                 <span>•</span>
-                <span>Jharkhand (Santhal ST)</span>
+                <span>{profile?.community || 'ST'} Category</span>
               </div>
               
               <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1D0A69] font-serif mt-1">
                 {language === 'hi' 
-                  ? 'नमस्ते, राजेश्वर सोरेन (Rajeshwar Soren)' 
-                  : 'Good afternoon, Rajeshwar Soren'}
+                  ? `नमस्ते, ${user?.first_name || user?.username}` 
+                  : `Welcome, ${user?.first_name || user?.username}`}
               </h1>
               
               <p className="text-xs sm:text-sm text-[#263238] mt-1 max-w-2xl">
-                {language === 'hi'
-                  ? 'आपका शीर्ष श्रेणी शिक्षा छात्रवृत्ति आवेदन (IIT खड़गपुर) वर्तमान में जांचाधीन है। 1 दस्तावेज़ विसंगति पर तत्काल कार्रवाई अपेक्षित है।'
-                  : 'Your Top Class Education scholarship application (IIT Kharagpur) is currently under nodal scrutiny with 1 actionable deficiency memo.'}
+                National Tribal Scholarship & Fellowship Portal — Track your active dossiers, manage verified document vault, and check real-time scrutiny status.
               </p>
             </div>
 
-            {/* NPCI DBT Direct Bank Status */}
-            <div className="bg-[#E8F5E9] border border-[#A5D6A7] p-3 rounded text-xs flex items-center gap-3">
-              <ShieldCheck className="w-5 h-5 text-[#198754] flex-shrink-0" />
+            {/* Profile Completion Meter */}
+            <div className="bg-[#F8F9FA] border border-[#CFD8DC] p-3 rounded-xl flex items-center gap-3 shadow-xs">
+              <div className="w-12 h-12 relative flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-[#ECEFF1]"
+                    strokeWidth="3.5"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className="text-[#1D0A69]"
+                    strokeDasharray={`${completionPct}, 100`}
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <span className="text-[11px] font-bold text-[#1D0A69] absolute">{completionPct}%</span>
+              </div>
               <div>
-                <div className="font-bold text-[#1B5E20]">Aadhaar-NPCI Bank Seeding Active</div>
-                <div className="text-[11px] text-[#2E7D32]">Bank of India (••••4912) • 100% Direct DBT Ready</div>
+                <div className="text-[10px] uppercase font-bold text-[#78909C]">Profile Status</div>
+                <div className="text-xs font-bold text-[#1D0A69]">
+                  {completionPct === 100 ? 'Fully Completed' : 'Profile Incomplete'}
+                </div>
+                <Link to="/profile" className="text-[11px] text-[#C85A17] font-semibold hover:underline">
+                  Update details →
+                </Link>
               </div>
             </div>
-          </div>
-
-          {/* Large Authoritative Status Callout */}
-          <div className="bg-[#FFF9C4] border-l-4 border-l-[#C85A17] p-4 border-t border-r border-b border-[#FFE082] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-[#C85A17] flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="text-xs font-mono font-bold text-[#7A5E00] uppercase tracking-wider">
-                  APPLICATION STATUS • MOTA/2026/TC/09841
-                </div>
-                <div className="text-base font-bold text-[#150202] font-serif mt-0.5">
-                  UNDER SCRUTINY — ACTION REQUIRED (RULE 4.2 DEFICIENCY)
-                </div>
-                <p className="text-xs text-[#7A5E00] mt-1 max-w-2xl leading-relaxed">
-                  The uploaded Income Certificate is dated <strong>14-Aug-2024</strong>. MoTA statutory directives require income certificates issued on or after <strong>01-April-2025</strong> for AY 2026-27.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={onResolveDeficiency}
-              className="gov-btn gov-btn-warning text-xs font-bold py-2.5 px-4 flex-shrink-0 shadow-sm"
-            >
-              <span>{language === 'hi' ? 'कमी का समाधान करें' : 'Resolve Deficiency Now'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          02. APPLICATION DOSSIER & VERIFIED EVIDENCE LEDGER
-          ───────────────────────────────────────────────────────────── */}
-      <section className="gov-container space-y-6">
-        <div className="border-b border-[#CFD8DC] pb-3">
-          <span className="text-[11px] font-bold text-[#C85A17] uppercase tracking-wider">
-            DOSSIER EVIDENCE INSPECTION
-          </span>
-          <h2 className="text-xl font-bold text-[#1D0A69] font-serif">
-            {language === 'hi' ? 'प्रमाणपत्र एवं दस्तावेज़ सत्यापन स्थिति' : 'Documentary Evidence Verification Ledger'}
-          </h2>
-          <p className="text-xs text-[#546E7A]">
-            {language === 'hi' ? 'डिजिटल प्रमाण पत्रों की सत्यापन प्रगति' : 'Multi-engine cryptographic and institutional verification records'}
-          </p>
-        </div>
-
-        {/* Process Ledger Table (Clean & Authoritative) */}
-        <div className="gov-table-wrapper">
-          <table className="gov-table" aria-label="Evidence Verification Ledger">
-            <thead>
-              <tr>
-                <th>Document Type</th>
-                <th>Certificate Ref / Identifier</th>
-                <th>Issuing Authority</th>
-                <th>Security & OCR Status</th>
-                <th>Statutory State</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  <div className="font-bold text-[#1D0A69]">Caste Certificate (ST)</div>
-                  <div className="text-[11px] text-[#546E7A]">Santhal Community</div>
-                </td>
-                <td className="font-mono text-xs">JH/ST/2022/883910</td>
-                <td>Sub-Divisional Officer, Ranchi, Jharkhand</td>
-                <td>
-                  <span className="text-xs font-bold text-[#198754] flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> DigiLocker Certified (SHA-256 Valid)
-                  </span>
-                </td>
-                <td>
-                  <span className="gov-badge gov-badge-success">VERIFIED</span>
-                </td>
-                <td>
-                  <button className="text-xs text-[#0F4C81] font-bold hover:underline flex items-center gap-1">
-                    <Download className="w-3 h-3" /> View PDF
-                  </button>
-                </td>
-              </tr>
-
-              <tr className="bg-[#FFF9C4]/30">
-                <td>
-                  <div className="font-bold text-[#1D0A69]">Income Certificate</div>
-                  <div className="text-[11px] text-[#546E7A]">Annual Family Income Declared: ₹2,40,000</div>
-                </td>
-                <td className="font-mono text-xs">INC/2024/09120</td>
-                <td>Tehsildar / Circle Officer, Ranchi</td>
-                <td>
-                  <span className="text-xs font-bold text-[#C85A17] flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Outdated FY (Issued 14-Aug-2024)
-                  </span>
-                </td>
-                <td>
-                  <span className="gov-badge gov-badge-warning">DEFICIENCY</span>
-                </td>
-                <td>
-                  <button 
-                    onClick={onResolveDeficiency}
-                    className="text-xs text-[#C85A17] font-bold hover:underline"
-                  >
-                    Re-upload →
-                  </button>
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  <div className="font-bold text-[#1D0A69]">Institutional Bonafide Certificate</div>
-                  <div className="text-[11px] text-[#546E7A]">IIT Kharagpur (AISHE: U-0570)</div>
-                </td>
-                <td className="font-mono text-xs">IITKGP/BONA/2026/881</td>
-                <td>Dean of Academic Affairs, IIT Kharagpur</td>
-                <td>
-                  <span className="text-xs font-bold text-[#198754] flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Digital Seal Inspected
-                  </span>
-                </td>
-                <td>
-                  <span className="gov-badge gov-badge-success">INSTITUTE VERIFIED</span>
-                </td>
-                <td>
-                  <button className="text-xs text-[#0F4C81] font-bold hover:underline flex items-center gap-1">
-                    <Download className="w-3 h-3" /> View Certificate
-                  </button>
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  <div className="font-bold text-[#1D0A69]">Fee Structure & Hostel Receipt</div>
-                  <div className="text-[11px] text-[#546E7A]">Annual Tuition & Hostel Entitlement</div>
-                </td>
-                <td className="font-mono text-xs">FEE/2026/0091</td>
-                <td>IIT Kharagpur Accounts Division</td>
-                <td>
-                  <span className="text-xs text-[#546E7A] flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Provisional OCR Extracted (₹2,45,000)
-                  </span>
-                </td>
-                <td>
-                  <span className="gov-badge gov-badge-info">PENDING DWO</span>
-                </td>
-                <td>
-                  <button className="text-xs text-[#0F4C81] font-bold hover:underline flex items-center gap-1">
-                    <Download className="w-3 h-3" /> Receipt
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* ─────────────────────────────────────────────────────────────
-            03. 5-STAGE VERIFICATION LIFECYCLE PROGRESS
-            ───────────────────────────────────────────────────────────── */}
-        <div className="bg-[#FFFFFF] border border-[#CFD8DC] p-6 space-y-4">
-          <div className="border-b border-[#ECEFF1] pb-2">
-            <h3 className="text-base font-bold text-[#1D0A69] font-serif">
-              Application Lifecycle Progress
-            </h3>
-            <p className="text-xs text-[#546E7A]">
-              Statutory verification checkpoints from student submission to PFMS credit
-            </p>
+      {/* 2. Quick Action Cards (Document Vault & Scheme Finder) */}
+      <section className="gov-container">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          {/* Document Vault Summary Card */}
+          <div className="bg-white p-5 rounded-xl border border-[#CFD8DC] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-lg bg-[#E8EAF6] text-[#1D0A69] flex items-center justify-center font-bold">
+                  <FolderLock className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded">
+                  ✓ ClamAV Safe
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-[#1D0A69] mt-3">My Document Vault</h3>
+              <p className="text-xs text-[#546E7A] mt-1">
+                {vaultDocs.length} important certificates saved. Reusable across all scholarship schemes.
+              </p>
+            </div>
+            <Link
+              to="/documents"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#1D0A69] hover:text-[#C85A17]"
+            >
+              <span>Open Document Vault</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
-            {[
-              { num: '1', title: 'Submitted', date: '12-Sep-2026', status: 'done' },
-              { num: '2', title: 'OCR & Virus Check', date: '12-Sep-2026', status: 'done' },
-              { num: '3', title: 'Institutional Scrutiny', date: '14-Sep-2026', status: 'current' },
-              { num: '4', title: 'DWO State Approval', date: 'Pending', status: 'pending' },
-              { num: '5', title: 'PFMS DBT Disbursal', date: 'Pending', status: 'pending' }
-            ].map((step) => (
+          {/* Start New Application Card */}
+          <div className="bg-white p-5 rounded-xl border border-[#CFD8DC] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-lg bg-[#FFF8E1] text-[#C85A17] flex items-center justify-center font-bold">
+                  <PlusCircle className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-[#C85A17] bg-[#FFF3E0] px-2 py-0.5 rounded">
+                  5 Schemes Open
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-[#1D0A69] mt-3">Apply for Scholarships</h3>
+              <p className="text-xs text-[#546E7A] mt-1">
+                Explore Top Class Education, National Fellowship, and Overseas Scholarships.
+              </p>
+            </div>
+            <Link
+              to="/schemes"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#1D0A69] hover:text-[#C85A17]"
+            >
+              <span>Explore Schemes & Apply</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* DBT & Bank Status Card */}
+          <div className="bg-white p-5 rounded-xl border border-[#CFD8DC] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-lg bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded">
+                  Aadhaar Seeded
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-[#1D0A69] mt-3">NPCI DBT Direct Account</h3>
+              <p className="text-xs text-[#546E7A] mt-1">
+                Direct Benefit Transfer enabled for sovereign stipend and fellowship disbursement.
+              </p>
+            </div>
+            <div className="mt-4 text-[11px] text-[#2E7D32] font-semibold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>100% Payment Ready</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 3. Active Applications List & Scrutiny Timeline */}
+      <section className="gov-container space-y-4">
+        <div className="flex items-center justify-between border-b border-[#CFD8DC] pb-2">
+          <div>
+            <h2 className="text-lg font-bold text-[#1D0A69] font-serif">
+              My Scholarship Applications
+            </h2>
+            <p className="text-xs text-[#546E7A]">
+              Authoritative statutory lifecycle tracking under Ministry of Tribal Affairs
+            </p>
+          </div>
+          <Link
+            to="/schemes"
+            className="text-xs font-bold bg-[#1D0A69] text-white hover:bg-[#15074D] px-3 py-1.5 rounded flex items-center gap-1.5"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>New Application</span>
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="bg-white p-8 rounded-xl border border-[#CFD8DC] text-center">
+            <RefreshCw className="w-6 h-6 animate-spin text-[#1D0A69] mx-auto mb-2" />
+            <p className="text-xs text-[#546E7A]">Retrieving your application dossiers...</p>
+          </div>
+        ) : applications.length === 0 ? (
+          <div className="bg-white p-8 rounded-xl border border-[#CFD8DC] text-center">
+            <FileText className="w-10 h-10 text-[#B0BEC5] mx-auto mb-2" />
+            <h3 className="text-sm font-bold text-[#1D0A69]">No Active Applications Found</h3>
+            <p className="text-xs text-[#546E7A] mt-1">
+              You haven't submitted any scholarship applications yet. Browse the official schemes and start your application.
+            </p>
+            <Link
+              to="/schemes"
+              className="mt-4 inline-flex items-center gap-1.5 bg-[#FFC107] text-[#120538] hover:bg-[#FFD54F] px-4 py-2 rounded text-xs font-bold"
+            >
+              <span>Browse 5 Statutory Schemes</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {applications.map((app) => (
               <div 
-                key={step.num}
-                className={`p-3 border-l-4 text-xs ${
-                  step.status === 'done' 
-                    ? 'border-l-[#198754] bg-[#E8F5E9]/50' 
-                    : step.status === 'current'
-                    ? 'border-l-[#FFC107] bg-[#FFF9C4]/40 font-bold'
-                    : 'border-l-[#CFD8DC] bg-[#F4F6F8] opacity-75'
-                }`}
+                key={app.id} 
+                className="bg-white border border-[#CFD8DC] rounded-xl p-5 shadow-xs hover:shadow-md transition-shadow"
               >
-                <div className="text-[10px] uppercase font-bold text-[#546E7A]">STAGE {step.num}</div>
-                <div className="font-bold text-[#150202] mt-0.5">{step.title}</div>
-                <div className="text-[10px] text-[#546E7A] mt-1">{step.date}</div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#ECEFF1]">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-[#1D0A69] bg-[#E8EAF6] px-2 py-0.5 rounded">
+                        APPLICATION #{app.application_number}
+                      </span>
+                      <span className="text-xs text-[#78909C]">
+                        AY {app.academic_year || '2026-27'}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-[#263238] mt-1">
+                      {app.scheme_code === 'TOP_CLASS' || app.scheme_code === 'TOP-05'
+                        ? 'Top Class Education for ST Students'
+                        : app.scheme_code === 'NFST'
+                        ? 'National Fellowship for Higher Education of ST Students'
+                        : app.scheme_code === 'NOS'
+                        ? 'National Overseas Scholarship for ST Candidates'
+                        : `MoTA Scheme (${app.scheme_code})`}
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-col items-start sm:items-end gap-1">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#E8F5E9] text-[#1B5E20] border border-[#C8E6C9] flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-[#1B5E20]" />
+                      <span>{app.current_state_code || 'UNDER_SCRUTINY'}</span>
+                    </span>
+                    <span className="text-[11px] text-[#78909C]">
+                      Next action: <strong className="text-[#37474F]">No action required</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Application Timeline Progress Bar */}
+                <div className="pt-4">
+                  <div className="text-[11px] font-bold text-[#546E7A] mb-2 uppercase tracking-wider">
+                    Statutory Verification Timeline
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                    <div className="bg-[#E8F5E9] text-[#2E7D32] p-2 rounded border border-[#C8E6C9] font-bold">
+                      ✓ 1. Submitted
+                    </div>
+                    <div className="bg-[#E8F5E9] text-[#2E7D32] p-2 rounded border border-[#C8E6C9] font-bold">
+                      ✓ 2. ClamAV & OCR Processed
+                    </div>
+                    <div className="bg-[#FFF8E1] text-[#F57F17] p-2 rounded border border-[#FFE082] font-bold animate-pulse">
+                      ● 3. Scrutiny Review
+                    </div>
+                    <div className="bg-[#ECEFF1] text-[#78909C] p-2 rounded font-semibold">
+                      ○ 4. Sanction & DBT
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Action */}
+                <div className="mt-4 pt-3 border-t border-[#ECEFF1] flex items-center justify-between">
+                  <span className="text-[11px] text-[#78909C]">
+                    Last updated: {new Date(app.updated_at || app.created_at).toLocaleDateString('en-IN')}
+                  </span>
+                  <Link
+                    to={`/applications/${app.id}/status`}
+                    className="text-xs font-bold text-[#1D0A69] hover:underline flex items-center gap-1"
+                  >
+                    <span>View Dossier Details</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* ─────────────────────────────────────────────────────────────
-            04. FINANCIAL ENTITLEMENT & SANCTION SUMMARY
-            ───────────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-[#FFFFFF] border border-[#CFD8DC] p-5">
-            <span className="text-[11px] font-bold text-[#546E7A] uppercase">Approved Tuition Outlay</span>
-            <div className="text-2xl font-bold text-[#1D0A69] font-serif mt-1">₹2,00,000</div>
-            <p className="text-xs text-[#546E7A] mt-1">100% Non-refundable tuition fees reimbursed to institution.</p>
-          </div>
-
-          <div className="bg-[#FFFFFF] border border-[#CFD8DC] p-5">
-            <span className="text-[11px] font-bold text-[#546E7A] uppercase">Living & Books Allowance</span>
-            <div className="text-2xl font-bold text-[#198754] font-serif mt-1">₹45,000</div>
-            <p className="text-xs text-[#546E7A] mt-1">Direct DBT allowance to student Bank of India account.</p>
-          </div>
-
-          <div className="bg-[#FFFFFF] border border-[#CFD8DC] p-5">
-            <span className="text-[11px] font-bold text-[#546E7A] uppercase">Computer Grant Entitlement</span>
-            <div className="text-2xl font-bold text-[#0F4C81] font-serif mt-1">₹45,000</div>
-            <p className="text-xs text-[#546E7A] mt-1">One-time laptop/computer grant upon first-year enrollment.</p>
-          </div>
-        </div>
+        )}
       </section>
+
     </div>
   );
 };

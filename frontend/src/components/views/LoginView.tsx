@@ -1,29 +1,32 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import { TribalPattern } from '../common/TribalPattern';
 import { 
-  Lock, RefreshCw, Volume2, 
-  ArrowRight, ShieldAlert, CheckCircle2, UserCheck, KeyRound, 
-  ShieldCheck
+  Lock, RefreshCw, ArrowRight, KeyRound, 
+  ShieldCheck, Eye, EyeOff, User, AlertCircle
 } from 'lucide-react';
 
-interface LoginViewProps {
-  onLoginSuccess: (role: 'applicant' | 'officer') => void;
-  onNavigateRegister: () => void;
-}
-
-export const LoginView: React.FC<LoginViewProps> = ({
-  onLoginSuccess,
-  onNavigateRegister
-}) => {
+export const LoginView: React.FC = () => {
   const { language } = useLanguage();
-  const [roleTab, setRoleTab] = useState<'applicant' | 'officer'>('applicant');
-  const [authMode, setAuthMode] = useState<'otp' | 'password'>('otp');
-  const [identifier, setIdentifier] = useState('OTR-2026-ST-884912');
-  const [otpValue, setOtpValue] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get redirect param from URL if visitor clicked 'Apply' while logged out
+  const searchParams = new URLSearchParams(location.search);
+  const redirectTarget = searchParams.get('redirect');
+
+  const [identifier, setIdentifier] = useState('demo_applicant');
+  const [password, setPassword] = useState('Tribal@2026');
+  const [showPassword, setShowPassword] = useState(false);
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('7W9XK2');
   const [affirmed, setAffirmed] = useState(true);
+
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const refreshCaptcha = () => {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -34,12 +37,36 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setCaptchaCode(res);
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (roleTab === 'applicant') {
-      onLoginSuccess('applicant');
-    } else {
-      onLoginSuccess('officer');
+    if (!identifier.trim() || !password.trim()) {
+      setErrorMessage('Please enter both your identifier and password.');
+      return;
+    }
+
+    if (captchaInput.trim().toUpperCase() !== captchaCode) {
+      setErrorMessage('Invalid security CAPTCHA code. Please re-enter.');
+      refreshCaptcha();
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const { destination, role } = await login(identifier.trim(), password.trim());
+      
+      // If there was an intended redirect target (e.g. scheme apply) and role is APPLICANT, honor it!
+      if (redirectTarget && role === 'APPLICANT') {
+        navigate(redirectTarget, { replace: true });
+      } else {
+        navigate(destination, { replace: true });
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Login failed. Invalid credentials.');
+      refreshCaptcha();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,7 +80,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
         <div className="gov-container relative py-7 sm:py-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              {/* Official Bilingual MoTA Logo */}
               <div className="bg-white p-2.5 rounded shadow-sm flex items-center justify-center flex-shrink-0">
                 <img 
                   src="/mota-logo.png" 
@@ -89,295 +115,192 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </div>
       </header>
 
-      {/* 2. Public Service Role Selector Ribbon */}
-      <nav className="bg-white border-b border-[#CFD8DC] sticky top-12 z-30 shadow-xs">
-        <div className="gov-container flex items-center gap-1 text-xs font-bold">
-          <button
-            onClick={() => setRoleTab('applicant')}
-            className={`flex items-center gap-2 py-3 px-5 border-b-2 transition-colors ${
-              roleTab === 'applicant'
-                ? 'border-[#1D0A69] text-[#1D0A69] bg-[#F4F6F8]'
-                : 'border-transparent text-[#546E7A] hover:text-[#1D0A69] hover:bg-[#F8F9FA]'
-            }`}
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>{language === 'hi' ? 'आवेदक / छात्र प्रवेश (Citizen Sign In)' : 'Applicant / Citizen Sign In'}</span>
-          </button>
-
-          <button
-            onClick={() => setRoleTab('officer')}
-            className={`flex items-center gap-2 py-3 px-5 border-b-2 transition-colors ${
-              roleTab === 'officer'
-                ? 'border-[#1D0A69] text-[#1D0A69] bg-[#F4F6F8]'
-                : 'border-transparent text-[#546E7A] hover:text-[#1D0A69] hover:bg-[#F8F9FA]'
-            }`}
-          >
-            <KeyRound className="w-4 h-4" />
-            <span>{language === 'hi' ? 'नोडल अधिकारी / जांचकर्ता (Officer DSC)' : 'Nodal Scrutiny Officer (DSC)'}</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* 3. Main Form Dossier Layout (Document Surface) */}
-      <main className="gov-container py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* 2. Main Login Content */}
+      <div className="gov-container py-10">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-md border border-[#CFD8DC] overflow-hidden">
           
-          {/* Left Column: Official Authentication Terminal (7 cols) */}
-          <div className="lg:col-span-7 bg-white border border-[#CFD8DC] rounded-lg shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-[#ECEFF1] bg-[#F8F9FA]">
-              <h2 className="text-base font-bold text-[#1D0A69] font-serif">
-                {roleTab === 'applicant'
-                  ? (language === 'hi' ? 'छात्रवृत्ति आवेदक प्रमाणीकरण' : 'Citizen Sign In with One-Time Registration (OTR)')
-                  : (language === 'hi' ? 'नोडल अधिकारी प्रवेश (डिजिटल हस्ताक्षर)' : 'Nodal Officer Verification Console (DSC Login)')}
+          <div className="p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-[#1D0A69]/10 rounded-full flex items-center justify-center mx-auto mb-2 text-[#1D0A69]">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <h2 className="text-lg font-bold text-[#1D0A69]">
+                {language === 'hi' ? 'नागरिक एवं अधिकारी प्रवेश' : 'Citizen & Officer Login'}
               </h2>
-              <p className="text-xs text-[#546E7A] mt-0.5">
-                {roleTab === 'applicant'
-                  ? 'Access your active scholarship dossier, resolve deficiencies & track PFMS DBT transfers.'
-                  : 'Review institutional bonafide records and certify ST scholarship applications.'}
+              <p className="text-xs text-[#546E7A] mt-1">
+                Enter your registered mobile, email, or username to securely access your portal.
               </p>
             </div>
 
-            <form onSubmit={handleLoginSubmit} className="p-6 sm:p-8 space-y-5 text-xs">
-              
-              {/* Auth Mode Toggle */}
-              <div className="flex border border-[#CFD8DC] rounded p-1 bg-[#F4F6F8]">
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('otp')}
-                  className={`flex-1 py-1.5 font-bold rounded transition-colors ${
-                    authMode === 'otp' ? 'bg-[#1D0A69] text-white shadow-xs' : 'text-[#546E7A] hover:text-[#1D0A69]'
-                  }`}
-                >
-                  {language === 'hi' ? 'ओटीआर / मोबाइल OTP' : 'OTR / Mobile OTP'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('password')}
-                  className={`flex-1 py-1.5 font-bold rounded transition-colors ${
-                    authMode === 'password' ? 'bg-[#1D0A69] text-white shadow-xs' : 'text-[#546E7A] hover:text-[#1D0A69]'
-                  }`}
-                >
-                  {language === 'hi' ? 'पासवर्ड द्वारा' : 'Password Sign In'}
-                </button>
+            {errorMessage && (
+              <div className="mb-5 bg-[#FFEBEE] border border-[#FFCDD2] text-[#C62828] p-3 rounded text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{errorMessage}</span>
               </div>
+            )}
 
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
               {/* Identifier Input */}
               <div>
-                <label className="gov-label text-xs">
-                  {roleTab === 'applicant'
-                    ? (language === 'hi' ? 'एकल पंजीकरण संख्या (OTR No.) अथवा मोबाइल' : 'One-Time Registration (OTR) No. / Mobile')
-                    : (language === 'hi' ? 'सरकारी ईमेल आईडी (gov.in / nic.in)' : 'Official Nodal Officer ID (NIC/Gov Email)')}
-                  <span className="gov-req">*</span>
+                <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                  Mobile Number / Email / Username
                 </label>
-                <input
-                  type="text"
-                  className="gov-input text-xs font-bold text-[#1D0A69]"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder={roleTab === 'applicant' ? 'OTR-2026-ST-884912' : 'sk.mahapatra@nic.in'}
-                  required
-                />
-                <span className="text-[11px] text-[#546E7A] mt-1 block">
-                  {roleTab === 'applicant' 
-                    ? 'OTR is your permanent 14-character ST scholarship identifier generated via Aadhaar e-KYC.' 
-                    : 'Institutional AISHE/UDISE nodal credentials issued by MoTA.'}
-                </span>
-              </div>
-
-              {/* OTP or Password Field */}
-              {authMode === 'otp' ? (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="gov-label text-xs mb-0">
-                      {language === 'hi' ? '6-अंकीय ओटीपी (OTP)' : 'Enter 6-Digit OTP'}
-                      <span className="gov-req">*</span>
-                    </label>
-                    <span className="text-[11px] text-[#198754] font-semibold">
-                      OTP Sent to Registered Mobile (••••••4912)
-                    </span>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#78909C]">
+                    <User className="w-4 h-4" />
                   </div>
                   <input
                     type="text"
-                    maxLength={6}
-                    placeholder="Enter 6-digit code"
-                    className="gov-input text-xs tracking-widest text-center font-bold"
-                    value={otpValue}
-                    onChange={(e) => setOtpValue(e.target.value)}
+                    required
+                    placeholder="e.g. demo_applicant or mobile/email"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 text-xs border border-[#CFD8DC] rounded-lg bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-[#1D0A69]"
                   />
-                  <div className="flex items-center justify-between text-[11px] text-[#546E7A] mt-1">
-                    <span>Resend OTP in <strong>01:42</strong></span>
-                    <button type="button" className="text-[#0F4C81] hover:underline font-semibold">
-                      Resend Code
-                    </button>
-                  </div>
                 </div>
-              ) : (
-                <div>
-                  <label className="gov-label text-xs">
-                    {language === 'hi' ? 'पासवर्ड (Password)' : 'Password'}
-                    <span className="gov-req">*</span>
+              </div>
+
+              {/* Password Input */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#1D0A69]">
+                    Password
                   </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••••••"
-                    className="gov-input text-xs"
-                    required
-                  />
                 </div>
-              )}
-
-              {/* Sovereign Security Captcha */}
-              <div className="bg-[#F8F9FA] p-3 rounded border border-[#CFD8DC] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#150202]">
-                    Security Verification Captcha:
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => alert(`Audio Captcha: ${captchaCode.split('').join(' ')}`)}
-                      className="p-1 text-[#546E7A] hover:text-[#1D0A69]"
-                      title="Audio Captcha for Accessibility"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={refreshCaptcha}
-                      className="p-1 text-[#546E7A] hover:text-[#1D0A69]"
-                      title="Refresh Captcha"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="bg-white border-2 border-dashed border-[#90A4AE] px-4 py-1.5 font-mono text-base font-extrabold tracking-widest select-none text-[#1D0A69] bg-[radial-gradient(#CFD8DC_1px,transparent_1px)] [background-size:8px_8px]">
-                    {captchaCode}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#78909C]">
+                    <Lock className="w-4 h-4" />
                   </div>
                   <input
-                    type="text"
-                    className="gov-input text-xs uppercase font-bold"
-                    placeholder="ENTER CAPTCHA"
-                    value={captchaInput}
-                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    type={showPassword ? 'text' : 'password'}
                     required
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-9 pr-10 py-2.5 text-xs border border-[#CFD8DC] rounded-lg bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-[#1D0A69]"
                   />
-                </div>
-              </div>
-
-              {/* Affirmative Action Declaration */}
-              {roleTab === 'applicant' && (
-                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-[#263238] pt-1">
-                  <input
-                    type="checkbox"
-                    checked={affirmed}
-                    onChange={(e) => setAffirmed(e.target.checked)}
-                    className="mt-0.5 rounded text-[#1D0A69]"
-                    required
-                  />
-                  <span>
-                    {language === 'hi'
-                      ? 'मैं प्रमाणित करता/करती हूँ कि मैं भारत के संविधान के अनुच्छेद 342 के तहत अधिसूचित अनुसूचित जनजाति (ST) का पात्र सदस्य हूँ।'
-                      : 'I affirm that I am applying under Scheduled Tribe (ST) affirmative action provisions as per Article 342 of the Constitution of India.'}
-                  </span>
-                </label>
-              )}
-
-              {/* Sign In CTA */}
-              <button
-                type="submit"
-                className="w-full bg-[#1D0A69] hover:bg-[#15074D] text-white font-bold py-3 px-4 rounded text-xs transition-colors flex items-center justify-center gap-2 shadow-sm"
-              >
-                <Lock className="w-4 h-4" />
-                <span>
-                  {roleTab === 'applicant'
-                    ? (language === 'hi' ? 'छात्र पोर्टल में प्रवेश करें' : 'Sign In to Student Portal')
-                    : (language === 'hi' ? 'अधिकारी कार्यक्षेत्र में प्रवेश' : 'Sign In to Scrutiny Workbench')}
-                </span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              {/* First Time Student Banner */}
-              {roleTab === 'applicant' && (
-                <div className="bg-[#FFFDE7] border border-[#FFE082] p-4 rounded text-xs space-y-1.5">
-                  <strong className="text-[#7A5E00] block font-bold">
-                    {language === 'hi' ? 'पहली बार आवेदन कर रहे हैं? (New Student?)' : 'First Time ST Applicant?'}
-                  </strong>
-                  <p className="text-[#5D4037]">
-                    Generate your lifetime One-Time Registration (OTR) with Aadhaar e-KYC to apply across all 5 MoTA schemes.
-                  </p>
                   <button
                     type="button"
-                    onClick={onNavigateRegister}
-                    className="text-[#1D0A69] font-bold hover:underline inline-flex items-center gap-1 pt-1"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#78909C] hover:text-[#1D0A69]"
                   >
-                    <span>Register New ST Candidate (नया पंजीकरण)</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              )}
-
-            </form>
-          </div>
-
-          {/* Right Column: Sovereign Guidelines & Trust Matrix (5 cols) */}
-          <div className="lg:col-span-5 space-y-5 text-xs">
-            
-            {/* Pre-requisites Dossier */}
-            <div className="bg-white border border-[#CFD8DC] rounded-lg p-5 space-y-3 shadow-xs">
-              <h3 className="font-bold text-[#1D0A69] font-serif text-sm border-b border-[#ECEFF1] pb-2">
-                Mandatory Prerequisites Before Sign In
-              </h3>
-              
-              <ul className="space-y-3">
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#198754] flex-shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-[#150202]">Aadhaar-Linked Active Mobile:</strong>
-                    <p className="text-[#546E7A]">Required for OTP delivery and cryptographic e-Sign under IT Act 2000.</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#198754] flex-shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-[#150202]">Revenue ST Caste Certificate:</strong>
-                    <p className="text-[#546E7A]">Issued by authorized Tehsildar/SDO with permanent digital verification code.</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#198754] flex-shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-[#150202]">Active NPCI-Mapped Bank Account:</strong>
-                    <p className="text-[#546E7A]">Direct Benefit Transfer (DBT) is credited solely via Aadhaar-seeded accounts.</p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal Warning Notice */}
-            <div className="p-4 bg-[#FFEBEE] border border-[#EF9A9A] rounded-lg text-[#B71C1C] space-y-2">
-              <div className="flex items-center gap-2 font-bold text-xs">
-                <ShieldAlert className="w-4 h-4 text-[#C62828] flex-shrink-0" />
-                <span>Statutory Warning (Sections 43 & 66, IT Act 2000)</span>
               </div>
-              <p className="text-[11px] leading-relaxed">
-                Falsification of caste, income, or enrollment credentials on this sovereign portal is a non-bailable criminal offense. All IP addresses, DSC tokens, and evidentiary uploads are digitally fingerprinted with SHA-256 ledgers.
-              </p>
+
+              {/* Security CAPTCHA */}
+              <div>
+                <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                  Security Captcha
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="bg-[#ECEFF1] border border-[#CFD8DC] px-3 py-2 rounded text-base font-mono font-extrabold tracking-widest text-[#1D0A69] select-none line-through">
+                    {captchaCode}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshCaptcha}
+                    className="p-2 text-[#546E7A] hover:text-[#1D0A69] hover:bg-[#ECEFF1] rounded"
+                    title="Refresh CAPTCHA"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter characters"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs border border-[#CFD8DC] rounded-lg uppercase tracking-wider focus:outline-none focus:border-[#1D0A69]"
+                  />
+                </div>
+              </div>
+
+              {/* Statutory Affirmation */}
+              <div className="flex items-start gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="affirmed"
+                  checked={affirmed}
+                  onChange={(e) => setAffirmed(e.target.checked)}
+                  className="mt-0.5 rounded text-[#1D0A69] focus:ring-[#1D0A69]"
+                />
+                <label htmlFor="affirmed" className="text-[11px] text-[#546E7A] leading-tight">
+                  I affirm that I am the authorized account holder and agree to MoTA portal IT security regulations.
+                </label>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading || !affirmed}
+                className="w-full bg-[#1D0A69] hover:bg-[#15074D] disabled:opacity-50 text-white py-2.5 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verifying Credentials...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{language === 'hi' ? 'सुरक्षित प्रवेश करें' : 'Sign In Securely'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Quick Persona Credentials for Pitch Showcase */}
+            <div className="mt-5 p-3 rounded-lg bg-[#F8F9FA] border border-[#ECEFF1] text-[11px]">
+              <div className="font-bold text-[#37474F] mb-1 flex items-center justify-between">
+                <span>Synthetic Demo Persona Credentials:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifier('demo_applicant');
+                    setPassword('Tribal@2026');
+                    setCaptchaInput(captchaCode);
+                  }}
+                  className="p-1.5 bg-white border border-[#CFD8DC] rounded hover:border-[#1D0A69] text-left"
+                >
+                  <div className="font-bold text-[#1D0A69]">ST Applicant</div>
+                  <div className="text-[#546E7A]">demo_applicant</div>
+                  <div className="text-[#78909C]">Tribal@2026</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifier('demo_officer');
+                    setPassword('Officer@2026');
+                    setCaptchaInput(captchaCode);
+                  }}
+                  className="p-1.5 bg-white border border-[#CFD8DC] rounded hover:border-[#1D0A69] text-left"
+                >
+                  <div className="font-bold text-[#C85A17]">Scrutiny Officer</div>
+                  <div className="text-[#546E7A]">demo_officer</div>
+                  <div className="text-[#78909C]">Officer@2026</div>
+                </button>
+              </div>
             </div>
 
-            {/* Support Desk */}
-            <div className="bg-[#F8F9FA] border border-[#CFD8DC] rounded-lg p-4 text-[11px] text-[#546E7A] space-y-1">
-              <strong className="text-[#150202] block">National Scholarship Helpdesk:</strong>
-              <div>Toll-Free Helpline: <strong>1800-11-7788</strong> (Monday to Friday 09:30 - 18:00 IST)</div>
-              <div>Technical Queries: <strong>mota-support@gov.in</strong></div>
+            {/* Register Link */}
+            <div className="mt-6 pt-4 border-t border-[#ECEFF1] text-center text-xs text-[#546E7A]">
+              <span>{language === 'hi' ? 'नया छात्र खाता चाहिए?' : 'New ST Applicant?'} </span>
+              <Link 
+                to="/register" 
+                className="font-bold text-[#1D0A69] hover:underline"
+              >
+                {language === 'hi' ? 'एकल पंजीकरण (OTR) करें' : 'One-Time Registration (OTR)'}
+              </Link>
             </div>
 
           </div>
-
         </div>
-      </main>
+      </div>
+
     </div>
   );
 };

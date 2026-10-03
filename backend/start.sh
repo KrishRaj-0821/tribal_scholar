@@ -44,6 +44,10 @@ python manage.py seed_schemes || echo "WARN: seed_schemes encountered a non-fata
 echo "==> Validating scheme statutory integrity..."
 python manage.py validate_schemes || echo "WARN: validate_schemes encountered a non-fatal warning."
 
+# 3.5. Seed synthetic demo scenario (demo_applicant & demo_officer)
+echo "==> Seeding MoTA synthetic demonstration scenario..."
+python manage.py seed_demo_scenario || echo "WARN: seed_demo_scenario encountered a non-fatal warning."
+
 # 4. Collect static files for WhiteNoise
 echo "==> Collecting static assets..."
 python manage.py collectstatic --noinput

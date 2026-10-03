@@ -161,7 +161,8 @@ class DemoScenarioService:
         )
         if applicant_user.role != UserRole.APPLICANT:
             applicant_user.role = UserRole.APPLICANT
-            applicant_user.save()
+        applicant_user.set_password("Tribal@2026")
+        applicant_user.save()
 
         applicant_profile, _ = ApplicantProfile.objects.get_or_create(
             user=applicant_user,
@@ -189,7 +190,9 @@ class DemoScenarioService:
         )
         if officer_user.role != UserRole.SCRUTINY_OFFICER:
             officer_user.role = UserRole.SCRUTINY_OFFICER
-            officer_user.save()
+        officer_user.set_password("Officer@2026")
+        officer_user.is_staff = True
+        officer_user.save()
 
         # 4. Target SchemeVersion
         scheme_version = SchemeVersion.objects.filter(

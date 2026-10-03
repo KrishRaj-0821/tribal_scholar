@@ -219,7 +219,8 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        'apps.core.authentication.CsrfExemptSessionAuthentication',
+        'apps.core.authentication.SessionTokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -227,6 +228,7 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'apps.core.views.custom_exception_handler',
 }
 
+CORS_ALLOW_CREDENTIALS = True
 cors_allowed_env = os.getenv('CORS_ALLOWED_ORIGINS')
 if cors_allowed_env:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_allowed_env.split(',') if origin.strip()]

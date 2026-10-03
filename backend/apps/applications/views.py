@@ -49,6 +49,27 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         # Applicants only see their own applications
         return Application.objects.filter(applicant__user=user)
 
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if 'scheme_version' not in data or not data['scheme_version']:
+            scheme_code = data.get('scheme_code') or data.get('scheme')
+            if scheme_code:
+                sv = SchemeVersion.objects.filter(scheme__code__iexact=str(scheme_code).replace('-', '_')).order_by('-version_number').first()
+                if not sv:
+                    sv = SchemeVersion.objects.filter(scheme__code__icontains=str(scheme_code)).first()
+                if sv:
+                    data['scheme_version'] = str(sv.id)
+            if 'scheme_version' not in data or not data['scheme_version']:
+                sv = SchemeVersion.objects.first()
+                if sv:
+                    data['scheme_version'] = str(sv.id)
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         user = self.request.user
         scheme_version = serializer.validated_data.get('scheme_version')

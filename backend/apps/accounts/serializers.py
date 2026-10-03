@@ -13,7 +13,7 @@ class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
-    role = serializers.ChoiceField(choices=UserRole.choices, default=UserRole.APPLICANT)
+    phone_number = serializers.CharField(max_length=15, required=False, allow_blank=True)
     community = serializers.ChoiceField(choices=CommunityCategory.choices, default=CommunityCategory.ST)
     annual_family_income = serializers.DecimalField(max_digits=12, decimal_places=2, default=0.00)
 
@@ -21,7 +21,8 @@ class RegisterSerializer(serializers.Serializer):
         community = validated_data.pop('community', 'ST')
         income = validated_data.pop('annual_family_income', 0.00)
         password = validated_data.pop('password')
-        role = validated_data.pop('role', UserRole.APPLICANT)
+        # Public registration creates APPLICANT only
+        role = UserRole.APPLICANT
 
         user = User.objects.create_user(
             password=password,
@@ -29,12 +30,12 @@ class RegisterSerializer(serializers.Serializer):
             **validated_data
         )
 
-        if role == UserRole.APPLICANT:
-            ApplicantProfile.objects.create(
-                user=user,
-                community=community,
-                annual_family_income=income,
-                is_synthetic=True
-            )
+        ApplicantProfile.objects.create(
+            user=user,
+            community=community,
+            annual_family_income=income,
+            is_synthetic=False
+        )
 
         return user
+

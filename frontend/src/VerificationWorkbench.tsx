@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useDemo } from './context/DemoContext';
+import { fetchApi } from './services/api';
 import { 
   FileText, CheckCircle, AlertTriangle, RefreshCw, Info,
   ShieldCheck, ArrowUpRight, HelpCircle, XCircle, ArrowRight
@@ -258,6 +259,30 @@ export default function VerificationWorkbench() {
 
     // Synchronize global SIH Demo State
     demoResolveConflict(decision, reason);
+
+    // Synchronize authoritative backend verification engine
+    (async () => {
+      try {
+        const statusRes = await fetchApi<any>('/api/v1/verification/demo/status/');
+        if (statusRes?.queue_item_id) {
+          const actionMap: Record<string, string> = {
+            'OVERRIDE_OCR': 'OVERRIDE_WITH_OCR',
+            'CONFIRM_DECLARED': 'CONFIRM_APPLICANT',
+            'REQUEST_DEFICIENCY': 'REQUEST_DEFICIENCY'
+          };
+          await fetchApi(`/api/v1/verification/conflicts/${statusRes.queue_item_id}/resolve/`, {
+            method: 'POST',
+            body: JSON.stringify({
+              decision_action: actionMap[decision] || 'OVERRIDE_WITH_OCR',
+              chosen_value: chosenValue,
+              reason: reason || `Conflict resolved using ${decision}`
+            })
+          });
+        }
+      } catch (err) {
+        console.warn('Backend sync warning:', err);
+      }
+    })();
 
     const newEvent: VerificationHistoryEvent = {
       id: `hist-${Date.now()}`,
