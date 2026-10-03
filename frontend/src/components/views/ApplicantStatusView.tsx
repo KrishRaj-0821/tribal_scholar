@@ -309,7 +309,8 @@ export const ApplicantStatusView: React.FC = () => {
         ) : notifications.length > 0 ? (
           <div className="space-y-2">
             {notifications.map((notif) => {
-              const isSent = notif.status === 'SENT';
+              const isSentToProvider = notif.status === 'SENT_TO_PROVIDER';
+              const isDelivered = notif.status === 'DELIVERED';
               const isPending = notif.status === 'PENDING' || notif.status === 'SENDING' || notif.status === 'RETRY_PENDING';
               const isFailed = notif.status === 'FAILED';
               const isDevSkipped = notif.status === 'DEV_SKIPPED';
@@ -318,8 +319,10 @@ export const ApplicantStatusView: React.FC = () => {
                 <div 
                   key={notif.id}
                   className={`p-3 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    isSent
+                    isDelivered
                       ? 'bg-[#E8F5E9] border-[#A5D6A7]'
+                      : isSentToProvider
+                      ? 'bg-[#E0F2F1] border-[#80CBC4]'
                       : isFailed
                       ? 'bg-[#FFEBEE] border-[#FFCDD2]'
                       : isDevSkipped
@@ -329,10 +332,16 @@ export const ApplicantStatusView: React.FC = () => {
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      {isSent && (
+                      {isDelivered && (
                         <span className="font-bold text-[#1B5E20] flex items-center gap-1">
                           <CheckCircle className="w-3.5 h-3.5 text-[#198754]" />
-                          <span>Notification: ✓ SMS sent</span>
+                          <span>Notification: ✓ Confirmed Delivered to Handset</span>
+                        </span>
+                      )}
+                      {isSentToProvider && (
+                        <span className="font-bold text-[#00695C] flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5 text-[#00897B]" />
+                          <span>Notification: ✓ Dispatched to Gateway (Fast2SMS)</span>
                         </span>
                       )}
                       {isPending && (
@@ -376,47 +385,61 @@ export const ApplicantStatusView: React.FC = () => {
                     )}
                   </div>
 
-                  {isFailed && (
-                    <button
-                      type="button"
-                      disabled={retryingId === notif.id}
-                      onClick={() => handleRetrySMS(notif.id)}
-                      className="self-start sm:self-auto bg-[#D32F2F] hover:bg-[#B71C1C] disabled:opacity-50 text-white px-3 py-1.5 rounded font-bold text-xs flex items-center gap-1 shadow-xs"
-                    >
-                      {retryingId === notif.id ? (
-                        <>
-                          <RefreshCw className="w-3 h-3 animate-spin" />
-                          <span>Retrying...</span>
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-3 h-3" />
-                          <span>Retry</span>
-                        </>
-                      )}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isSentToProvider && (
+                      <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-[#80CBC4] font-mono text-[#00695C] font-bold">
+                        SENT_TO_PROVIDER
+                      </span>
+                    )}
+                    {isDelivered && (
+                      <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-[#A5D6A7] font-mono text-[#1B5E20] font-bold">
+                        DELIVERED
+                      </span>
+                    )}
+
+                    {isFailed && (
+                      <button
+                        type="button"
+                        disabled={retryingId === notif.id}
+                        onClick={() => handleRetrySMS(notif.id)}
+                        className="self-start sm:self-auto bg-[#D32F2F] hover:bg-[#B71C1C] disabled:opacity-50 text-white px-3 py-1.5 rounded font-bold text-xs flex items-center gap-1 shadow-xs"
+                      >
+                        {retryingId === notif.id ? (
+                          <>
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>Retrying...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3" />
+                            <span>Retry</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         ) : (
           /* Default state when demonstrating without persisted backend record */
-          <div className="p-3.5 rounded-lg bg-[#E8F5E9] border border-[#A5D6A7] text-xs flex items-center justify-between">
+          <div className="p-3.5 rounded-lg bg-[#E0F2F1] border border-[#80CBC4] text-xs flex items-center justify-between">
             <div className="space-y-0.5">
-              <div className="font-bold text-[#1B5E20] flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4 text-[#198754]" />
-                <span>Notification: ✓ SMS sent</span>
+              <div className="font-bold text-[#00695C] flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-[#00897B]" />
+                <span>Notification: ✓ Dispatched to Gateway (Fast2SMS)</span>
               </div>
-              <p className="text-[11px] text-[#2E7D32]">
-                Official submission notification dispatched to registered mobile: <strong>******4912</strong> via Fast2SMS.
+              <p className="text-[11px] text-[#004D40]">
+                Official submission notification dispatched to registered mobile: <strong>******4912</strong>.
               </p>
             </div>
-            <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-[#C8E6C9] font-mono text-[#2E7D32] font-bold">
-              DELIVERED
+            <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-[#80CBC4] font-mono text-[#00695C] font-bold">
+              SENT_TO_PROVIDER
             </span>
           </div>
         )}
+
       </div>
 
     </div>

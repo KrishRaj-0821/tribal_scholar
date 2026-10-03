@@ -19,9 +19,12 @@ class SMSNotificationSerializer(serializers.ModelSerializer):
             'message_length',
             'failure_reason',
             'created_at',
-            'sent_at'
+            'sent_at',
+            'delivered_at',
+            'dlr_status',
         ]
         read_only_fields = fields
+
 
 
 class NotificationSerializer(serializers.ModelSerializer):

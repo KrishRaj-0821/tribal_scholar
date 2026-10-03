@@ -60,7 +60,8 @@ class SMSNotificationType(models.TextChoices):
 class SMSDeliveryStatus(models.TextChoices):
     PENDING = 'PENDING', 'Pending Dispatch'
     SENDING = 'SENDING', 'Sending via Provider'
-    SENT = 'SENT', 'Delivered to Provider'
+    SENT_TO_PROVIDER = 'SENT_TO_PROVIDER', 'Dispatched / Sent to Provider'
+    DELIVERED = 'DELIVERED', 'Delivered to Recipient (DLR Confirmed)'
     FAILED = 'FAILED', 'Delivery Failed'
     RETRY_PENDING = 'RETRY_PENDING', 'Pending Retry'
     DEV_SKIPPED = 'DEV_SKIPPED', 'Skipped in Development Mode'
@@ -77,6 +78,7 @@ class SMSNotification(models.Model):
     Authoritative SMS notification delivery and audit ledger.
     Never stores plaintext credentials or sensitive applicant identity.
     Enforces idempotency to prevent duplicate mobile dispatches.
+    Extensible for future Fast2SMS delivery webhooks.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     notification_type = models.CharField(
@@ -120,7 +122,10 @@ class SMSNotification(models.Model):
     failure_reason = models.TextField(blank=True, default='')
     retry_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    sent_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when provider accepted the SMS.")
+    delivered_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when carrier confirmed delivery via future DLR webhook.")
+    dlr_status = models.CharField(max_length=50, blank=True, default='', help_text="Carrier delivery receipt status.")
+    dlr_payload_json = models.JSONField(default=dict, blank=True, help_text="Raw delivery report webhook payload for audit.")
 
     class Meta:
         ordering = ['-created_at']
@@ -128,6 +133,7 @@ class SMSNotification(models.Model):
             models.Index(fields=['application', 'notification_type']),
             models.Index(fields=['status', 'created_at']),
         ]
+
 
     def __str__(self):
         return f"SMS [{self.notification_type}] -> {self.recipient_phone_masked} ({self.status})"

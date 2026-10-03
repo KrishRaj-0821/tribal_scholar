@@ -358,14 +358,17 @@ export interface SMSNotificationRecord {
   id: string;
   notification_type: string;
   recipient_phone_masked: string;
-  status: 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'RETRY_PENDING' | 'DEV_SKIPPED';
+  status: 'PENDING' | 'SENDING' | 'SENT_TO_PROVIDER' | 'DELIVERED' | 'FAILED' | 'RETRY_PENDING' | 'DEV_SKIPPED';
   provider: string;
   provider_request_id?: string;
   message_length: number;
   failure_reason?: string;
   created_at: string;
   sent_at?: string;
+  delivered_at?: string;
+  dlr_status?: string;
 }
+
 
 export const notificationsApi = {
   getApplicationSMS: async (applicationId: string) => {

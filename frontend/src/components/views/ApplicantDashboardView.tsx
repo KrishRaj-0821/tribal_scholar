@@ -301,12 +301,15 @@ export const ApplicantDashboardView: React.FC<ApplicantDashboardViewProps> = () 
 
                 {/* SMS Notification Status Badge */}
                 <div className="mt-3 flex items-center justify-between bg-[#F8F9FA] px-3 py-1.5 rounded border border-[#ECEFF1] text-[11px]">
-                  <div className="flex items-center gap-1.5 text-[#1B5E20] font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#198754]" />
-                    <span>Notification: ✓ SMS sent (******4912)</span>
+                  <div className="flex items-center gap-1.5 text-[#00695C] font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#00897B]" />
+                    <span>Notification: ✓ Dispatched to Gateway (******4912)</span>
                   </div>
-                  <span className="text-[10px] text-[#546E7A]">Fast2SMS Delivery Confirmed</span>
+                  <span className="text-[10px] text-[#546E7A] bg-white px-2 py-0.5 rounded border border-gray-200 font-mono font-bold">
+                    SENT_TO_PROVIDER
+                  </span>
                 </div>
+
 
 
                 {/* Bottom Action */}

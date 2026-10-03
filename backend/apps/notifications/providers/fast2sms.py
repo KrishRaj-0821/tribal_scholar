@@ -177,12 +177,13 @@ class Fast2SMSProvider(BaseSMSProvider):
             logger.info("Fast2SMS dispatch successful to %s (request_id=%s)", masked_phone, request_id)
             return SMSProviderResult(
                 success=True,
-                status='SENT',
+                status='SENT_TO_PROVIDER',
                 provider_request_id=request_id,
                 message=provider_message_str,
                 raw_response=resp_json
             )
         elif response.status_code in (500, 502, 503, 504):
+
             # Transient 5xx server error -> candidate for bounded retry
             logger.warning("Fast2SMS 5xx gateway error (%d): %s", response.status_code, provider_message_str)
             return SMSProviderResult(

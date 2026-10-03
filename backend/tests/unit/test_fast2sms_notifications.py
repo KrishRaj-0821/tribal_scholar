@@ -152,9 +152,10 @@ class TestFast2SMSProviderMocked:
         )
 
         assert result.success is True
-        assert result.status == 'SENT'
+        assert result.status == 'SENT_TO_PROVIDER'
         assert result.provider_request_id == "fast2sms_req_9988"
         assert result.is_transient_failure is False
+
 
         # Verify correct request structure as per Fast2SMS Quick SMS specification
         mock_post.assert_called_once()
@@ -248,7 +249,7 @@ class TestCeleryTaskRetries:
         mock_provider = MagicMock()
         mock_provider.send_sms.return_value = SMSProviderResult(
             success=True,
-            status='SENT',
+            status='SENT_TO_PROVIDER',
             provider_request_id="fast2sms_req_task_1",
             raw_response={"return": True}
         )
@@ -268,9 +269,10 @@ class TestCeleryTaskRetries:
         )
 
         notif.refresh_from_db()
-        assert notif.status == NotificationStatus.SENT
+        assert notif.status == NotificationStatus.SENT_TO_PROVIDER
         assert notif.provider_request_id == "fast2sms_req_task_1"
         assert notif.sent_at is not None
+
 
     @patch("apps.notifications.tasks.get_sms_provider")
     def test_permanent_failure_marks_notification_failed_no_retry(self, mock_get_provider):

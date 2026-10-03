@@ -27,7 +27,7 @@ def dispatch_sms_notification_task(self, notification_id: str, phone_number: str
         return
 
     # Check if already in terminal state
-    if notification.status in (SMSDeliveryStatus.SENT, SMSDeliveryStatus.DEV_SKIPPED):
+    if notification.status in (SMSDeliveryStatus.SENT_TO_PROVIDER, SMSDeliveryStatus.DELIVERED, SMSDeliveryStatus.DEV_SKIPPED):
         logger.info("SMSNotification %s already finalized (%s).", notification_id, notification.status)
         return
 
@@ -37,14 +37,14 @@ def dispatch_sms_notification_task(self, notification_id: str, phone_number: str
     provider = get_sms_provider()
     result = provider.send_sms(phone_number=phone_number, message=message)
 
-
     if result.success:
-        notification.status = SMSDeliveryStatus.SENT if result.status == 'SENT' else SMSDeliveryStatus.DEV_SKIPPED
+        notification.status = SMSDeliveryStatus.SENT_TO_PROVIDER if result.status == 'SENT_TO_PROVIDER' else SMSDeliveryStatus.DEV_SKIPPED
         notification.provider_request_id = result.provider_request_id
         notification.sent_at = timezone.now()
         notification.failure_reason = ''
         notification.save(update_fields=['status', 'provider_request_id', 'sent_at', 'failure_reason'])
-        logger.info("SMSNotification %s delivered successfully via Fast2SMS.", notification_id)
+        logger.info("SMSNotification %s dispatched to Fast2SMS provider successfully.", notification_id)
+
     elif result.status == 'RETRY_PENDING':
         # Transient failure (network/5xx) -> trigger Celery retry
         notification.status = SMSDeliveryStatus.RETRY_PENDING
