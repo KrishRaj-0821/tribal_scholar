@@ -1072,9 +1072,9 @@ class DocumentVerificationService:
 
                 extracted_fields.append({
                     "field_code": code,
-                    "field_label": pf.field_definition.label if pf.field_definition else code.replace('_', ' ').title(),
+                    "field_label": pf.field_label or code.replace('_', ' ').title(),
                     "declared_value": decl_val,
-                    "ocr_value": pf.extracted_value_json,
+                    "ocr_value": pf.normalized_value if pf.normalized_value is not None else pf.raw_value,
                     "verified_value": verif_val,
                     "official_value": off_val,
                     "verification_status": "VERIFIED" if verif_val is not None else ("CONFLICT" if has_conflict else "PENDING"),

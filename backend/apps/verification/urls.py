@@ -1,13 +1,18 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    VerificationQueueViewSet, DocumentVerificationViewSet, resolve_conflict_api_view
+    VerificationQueueViewSet, DocumentVerificationViewSet, resolve_conflict_api_view,
+    demo_reset_api_view, demo_status_api_view
 )
 
 router = DefaultRouter()
 router.register(r'queue', VerificationQueueViewSet, basename='verification-queue')
 
 urlpatterns = [
+    # Synthetic SIH Demonstration Endpoints
+    path('demo/reset/', demo_reset_api_view, name='demo-reset'),
+    path('demo/status/', demo_status_api_view, name='demo-status'),
+
     # Document Evidence & Verification Actions
     path('documents/<uuid:pk>/evidence/', DocumentVerificationViewSet.as_view({'get': 'get_document_evidence'}), name='verification-doc-evidence'),
     path('documents/<str:pk>/evidence/', DocumentVerificationViewSet.as_view({'get': 'get_document_evidence'}), name='verification-doc-evidence-str'),

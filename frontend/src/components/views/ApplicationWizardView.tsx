@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useDemo } from '../../context/DemoContext';
 import { OFFICIAL_MOTA_SCHEMES, SchemeInfo } from '../../theme/tokens';
 import { TribalPattern } from '../common/TribalPattern';
 import { 
   CheckCircle2, ArrowRight, ArrowLeft, 
   FileText, ShieldCheck, UploadCloud, AlertCircle, 
-  FileCheck2, User, BookOpen, Landmark
+  FileCheck2, User, BookOpen, Landmark, Save, Sparkles
 } from 'lucide-react';
 
 interface ApplicationWizardViewProps {
@@ -20,39 +21,36 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   onCancel
 }) => {
   const { language } = useLanguage();
+  const { applicant, setCurrentStep: setDemoStep } = useDemo();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedSchemeCode, setSelectedSchemeCode] = useState<string>(initialScheme?.code || 'TOP-05');
+  const [draftSavedMsg, setDraftSavedMsg] = useState<string | null>(null);
   
-  // Demographic and Form fields
-  const [fatherName, setFatherName] = useState('Shri Mangal Soren');
-  const [motherName, setMotherName] = useState('Smt. Sita Soren');
-  const [institutionName, setInstitutionName] = useState('Indian Institute of Technology, Kharagpur');
+  // Demographic and Form fields (Prefilled with Demo ST Applicant)
+  const [fullName, setFullName] = useState(applicant.name || 'Demo ST Applicant');
+  const [fatherName, setFatherName] = useState('Shri Rameshwar Munda');
+  const [motherName, setMotherName] = useState('Smt. Radha Munda');
+  const [stateName, setStateName] = useState(applicant.state || 'Madhya Pradesh');
+  const [districtName] = useState(applicant.district || 'Mandla');
+  const [categoryName, setCategoryName] = useState(applicant.category || 'Scheduled Tribe (ST)');
+  const [institutionName, setInstitutionName] = useState(applicant.institution || 'Synthetic Demo University (IIT Indore)');
   const [aisheCode, setAisheCode] = useState('U-0570');
-  const [courseName, setCourseName] = useState('B.Tech in Computer Science & Engineering');
-  const [admissionYear, setAdmissionYear] = useState('2024');
-  const [annualIncome, setAnnualIncome] = useState('240000');
-  
-  // Document Upload States
-  const [incomeDocUploaded, setIncomeDocUploaded] = useState(true);
-  const [feeDocUploaded, setFeeDocUploaded] = useState(false);
-  const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [courseName, setCourseName] = useState(applicant.course || 'Postgraduate (M.Tech CSE)');
+  const [admissionYear, setAdmissionYear] = useState('2026');
+  const [annualIncome, setAnnualIncome] = useState(String(applicant.declaredIncome || '500000'));
 
-  const simulateUpload = (fieldName: string) => {
-    setUploadingField(fieldName);
-    setTimeout(() => {
-      if (fieldName === 'fee') setFeeDocUploaded(true);
-      if (fieldName === 'income') setIncomeDocUploaded(true);
-      setUploadingField(null);
-    }, 1400);
+  const handleSaveDraft = () => {
+    setDraftSavedMsg("✓ Application draft securely cached in sovereign state storage.");
+    setTimeout(() => setDraftSavedMsg(null), 4000);
   };
 
   const steps = [
-    { num: 1, icon: User, titleEn: '1. Demographics', titleHi: '1. व्यक्तिगत साख' },
-    { num: 2, icon: BookOpen, titleEn: '2. Academic Record', titleHi: '2. शैक्षणिक विवरण' },
-    { num: 3, icon: Landmark, titleEn: '3. Scheme Selection', titleHi: '3. योजना चयन' },
-    { num: 4, icon: ShieldCheck, titleEn: '4. Bank DBT Mapping', titleHi: '4. बैंक डीबीटी' },
-    { num: 5, icon: FileText, titleEn: '5. Document Pipeline', titleHi: '5. दस्तावेज़ एवं OCR' },
-    { num: 6, icon: CheckCircle2, titleEn: '6. Review & Submit', titleHi: '6. समीक्षा एवं जमा' }
+    { num: 1, icon: User, titleEn: 'PERSONAL', titleHi: 'व्यक्तिगत' },
+    { num: 2, icon: BookOpen, titleEn: 'ACADEMIC', titleHi: 'शैक्षणिक' },
+    { num: 3, icon: Landmark, titleEn: 'SCHEME', titleHi: 'योजना' },
+    { num: 4, icon: ShieldCheck, titleEn: 'FINANCIAL', titleHi: 'वित्तीय / बैंक' },
+    { num: 5, icon: FileText, titleEn: 'DOCUMENTS', titleHi: 'दस्तावेज़' },
+    { num: 6, icon: CheckCircle2, titleEn: 'REVIEW', titleHi: 'समीक्षा' }
   ];
 
   return (
@@ -153,18 +151,33 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
 
             <div className="text-right text-xs">
               <span className="text-[#546E7A]">Applicant: </span>
-              <strong className="text-[#1D0A69]">Rajeshwar Soren</strong>
+              <strong className="text-[#1D0A69]">{fullName}</strong>
+              <span className="ml-1.5 bg-[#FFC107] text-[#1D0A69] font-extrabold px-1.5 py-0.5 rounded text-[10px]">
+                SYNTHETIC DEMO
+              </span>
             </div>
           </div>
+
+          {draftSavedMsg && (
+            <div className="mx-6 sm:mx-8 mt-4 p-2.5 bg-[#E8F5E9] border border-[#A5D6A7] rounded text-xs text-[#1B5E20] font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#198754]" />
+              <span>{draftSavedMsg}</span>
+            </div>
+          )}
 
           <div className="p-6 sm:p-8 space-y-6">
             
             {/* STEP 1: PERSONAL DETAILS */}
             {currentStep === 1 && (
               <div className="space-y-6">
-                <div className="p-3 bg-[#E8F5E9] border border-[#A5D6A7] rounded text-xs text-[#1B5E20] flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#198754] flex-shrink-0" />
-                  <span>Demographic credentials pre-filled from your verified UIDAI Aadhaar e-KYC record.</span>
+                <div className="p-3 bg-[#E8F5E9] border border-[#A5D6A7] rounded text-xs text-[#1B5E20] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-[#198754] flex-shrink-0" />
+                    <span>Demographic credentials pre-filled from your verified UIDAI Aadhaar e-KYC record (Mandla, MP).</span>
+                  </div>
+                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded font-bold text-[#1D0A69] border border-[#A5D6A7]">
+                    Aadhaar Linked
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
@@ -173,8 +186,8 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     <input 
                       type="text" 
                       className="gov-input text-xs bg-[#F4F6F8] font-bold text-[#150202]" 
-                      value="Rajeshwar Soren" 
-                      readOnly 
+                      value={fullName} 
+                      onChange={(e) => setFullName(e.target.value)}
                     />
                   </div>
                   <div>
@@ -217,8 +230,8 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     <input 
                       type="text" 
                       className="gov-input text-xs bg-[#F4F6F8] font-semibold text-[#150202]" 
-                      value="Santhal (Scheduled Tribe)" 
-                      readOnly 
+                      value={categoryName} 
+                      onChange={(e) => setCategoryName(e.target.value)}
                     />
                   </div>
                   <div>
@@ -226,12 +239,12 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     <input 
                       type="text" 
                       className="gov-input text-xs bg-[#F4F6F8] font-semibold text-[#150202]" 
-                      value="Jharkhand" 
-                      readOnly 
+                      value={`${districtName}, ${stateName}`} 
+                      onChange={(e) => setStateName(e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="gov-label text-xs">Annual Family Income (₹) <span className="gov-req">*</span></label>
+                    <label className="gov-label text-xs">Declared Annual Family Income (₹) <span className="gov-req">*</span></label>
                     <input 
                       type="number" 
                       className="gov-input text-xs font-bold text-[#1D0A69]" 
@@ -403,6 +416,27 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                 </div>
 
                 <div className="space-y-4">
+                  {/* DEMO PROMINENT CTA TO STEP 4 (OCR) */}
+                  <div className="bg-[#1D0A69] text-white p-4 rounded-md border-2 border-[#FFC107] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                    <div>
+                      <div className="flex items-center gap-2 font-bold text-sm text-[#FFC107]">
+                        <Sparkles className="w-4 h-4" />
+                        <span>Live ClamAV Security & Multi-Lingual PaddleOCR Engine</span>
+                      </div>
+                      <p className="text-xs text-white/80 mt-1">
+                        Experience the complete automated ingestion pipeline with synthetic revenue income certificate (Mandla, MP).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDemoStep('upload_ocr')}
+                      className="bg-[#FFC107] hover:bg-[#FFA000] text-[#1D0A69] font-extrabold px-4 py-2.5 rounded text-xs flex items-center gap-2 shadow-md whitespace-nowrap self-start sm:self-auto transition-colors"
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Launch Ingestion & OCR Pipeline →</span>
+                    </button>
+                  </div>
+
                   {/* Document 1: ST Caste Certificate */}
                   <div className="p-4 border border-[#CFD8DC] rounded-md bg-white space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -415,7 +449,7 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                       </span>
                     </div>
                     <div className="text-[11px] text-[#546E7A] flex flex-wrap items-center justify-between gap-2 bg-[#F8F9FA] p-2 rounded">
-                      <span>File: <code>JH_ST_CERT_SOREN.pdf</code> (SHA-256: <code>8f14b...091e</code>)</span>
+                      <span>File: <code>MP_ST_CERT_MANDLA.pdf</code> (SHA-256: <code>8f14b...091e</code>)</span>
                       <span className="text-[#198754] font-bold">ClamAV Clean</span>
                     </div>
                   </div>
@@ -427,23 +461,17 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                         <FileText className="w-5 h-5 text-[#1D0A69]" />
                         <strong className="text-xs text-[#150202]">2. Current FY Family Income Certificate (Rule 4.2)</strong>
                       </div>
-                      {incomeDocUploaded ? (
-                        <span className="bg-[#E8F5E9] text-[#198754] text-[11px] font-bold px-2 py-0.5 rounded border border-[#A5D6A7]">
-                          ✓ Ingested & Scanned
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => simulateUpload('income')}
-                          className="bg-[#1D0A69] hover:bg-[#15074D] text-white text-[11px] font-bold py-1 px-3 rounded flex items-center gap-1.5"
-                        >
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>{uploadingField === 'income' ? 'Scanning (ClamAV)...' : 'Upload Certificate'}</span>
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDemoStep('upload_ocr')}
+                        className="bg-[#1D0A69] hover:bg-[#15074D] text-[#FFC107] text-[11px] font-bold py-1 px-3 rounded flex items-center gap-1.5"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        <span>Inspect in OCR Console</span>
+                      </button>
                     </div>
                     <p className="text-[11px] text-[#546E7A]">
-                      Issued on or after 01-April-2025 by Revenue Officer / Tehsildar (Max 2MB, PDF/JPEG).
+                      Issued on 15-January-2026 by Tehsildar, Mandla (M.P.). Provisional extraction: ₹4,50,000.
                     </p>
                   </div>
 
@@ -459,35 +487,7 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-[#546E7A]">
-                      Signed by Dean of Academic Affairs, IIT Kharagpur with AISHE Code U-0570.
-                    </p>
-                  </div>
-
-                  {/* Document 4: Sanctioned Fee Structure */}
-                  <div className="p-4 border border-[#CFD8DC] rounded-md bg-white space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-[#1D0A69]" />
-                        <strong className="text-xs text-[#150202]">4. Sanctioned Fee Structure & Semester Receipt</strong>
-                      </div>
-                      {feeDocUploaded ? (
-                        <span className="bg-[#E8F5E9] text-[#198754] text-[11px] font-bold px-2 py-0.5 rounded border border-[#A5D6A7]">
-                          ✓ Uploaded & Scanned
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={uploadingField === 'fee'}
-                          onClick={() => simulateUpload('fee')}
-                          className="bg-[#0F4C81] hover:bg-[#0C3B66] text-white text-[11px] font-bold py-1 px-3 rounded flex items-center gap-1.5"
-                        >
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>{uploadingField === 'fee' ? 'Scanning (ClamAV)...' : 'Upload Receipt'}</span>
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[#546E7A]">
-                      Required for direct tuition fee reimbursement under Central Sector Top Class Education Scheme.
+                      Signed by Dean of Academic Affairs, Synthetic Demo University (IIT Indore).
                     </p>
                   </div>
                 </div>
@@ -498,13 +498,16 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
             {currentStep === 6 && (
               <div className="space-y-6 text-xs">
                 <div className="border border-[#CFD8DC] rounded-md overflow-hidden">
-                  <div className="bg-[#1D0A69] text-white px-4 py-2 font-bold font-serif text-sm">
-                    Final Application Dossier Summary
+                  <div className="bg-[#1D0A69] text-white px-4 py-2 font-bold font-serif text-sm flex items-center justify-between">
+                    <span>Final Application Dossier Summary</span>
+                    <span className="bg-[#FFC107] text-[#1D0A69] font-bold px-2 py-0.5 rounded text-xs">
+                      Mandla ST Synthetic Scenario
+                    </span>
                   </div>
                   <div className="divide-y divide-[#ECEFF1] p-2 bg-[#FAFAFA]">
                     <div className="grid grid-cols-3 p-2.5">
                       <span className="text-[#546E7A] font-semibold">Applicant Name</span>
-                      <span className="col-span-2 text-[#150202] font-bold">Rajeshwar Soren (OTR-2026-ST-884912)</span>
+                      <span className="col-span-2 text-[#150202] font-bold">{fullName} (OTR-2026-ST-884912)</span>
                     </div>
                     <div className="grid grid-cols-3 p-2.5">
                       <span className="text-[#546E7A] font-semibold">Target Scheme</span>
@@ -512,19 +515,19 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     </div>
                     <div className="grid grid-cols-3 p-2.5">
                       <span className="text-[#546E7A] font-semibold">Institution</span>
-                      <span className="col-span-2 text-[#150202]">Indian Institute of Technology, Kharagpur (U-0570)</span>
+                      <span className="col-span-2 text-[#150202]">{institutionName} (AISHE: {aisheCode})</span>
                     </div>
                     <div className="grid grid-cols-3 p-2.5">
                       <span className="text-[#546E7A] font-semibold">Degree / Course</span>
-                      <span className="col-span-2 text-[#150202]">B.Tech in Computer Science & Engineering</span>
+                      <span className="col-span-2 text-[#150202]">{courseName}</span>
                     </div>
                     <div className="grid grid-cols-3 p-2.5">
-                      <span className="text-[#546E7A] font-semibold">Annual Family Income</span>
-                      <span className="col-span-2 text-[#150202] font-mono font-bold">₹2,40,000 (Within Statutory Ceiling)</span>
+                      <span className="text-[#546E7A] font-semibold">Declared Annual Income</span>
+                      <span className="col-span-2 text-[#150202] font-mono font-bold">₹{Number(annualIncome).toLocaleString('en-IN')} (Self-Declared)</span>
                     </div>
                     <div className="grid grid-cols-3 p-2.5">
                       <span className="text-[#546E7A] font-semibold">DBT Remittance Bank</span>
-                      <span className="col-span-2 text-[#198754] font-bold">Bank of India (Aadhaar Seeded ••••4912)</span>
+                      <span className="col-span-2 text-[#198754] font-bold">State Bank of India (Aadhaar Seeded ••••4912)</span>
                     </div>
                   </div>
                 </div>
@@ -544,39 +547,63 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
           </div>
 
           {/* Bottom Wizard Navigation Action Ribbon */}
-          <div className="p-4 sm:p-6 bg-[#F8F9FA] border-t border-[#CFD8DC] flex items-center justify-between gap-4">
-            {currentStep > 1 ? (
+          <div className="p-4 sm:p-6 bg-[#F8F9FA] border-t border-[#CFD8DC] flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              {currentStep > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(currentStep - 1)}
+                  className="gov-btn gov-btn-secondary text-xs flex items-center gap-1.5 font-bold"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setCurrentStep(currentStep - 1)}
-                className="gov-btn gov-btn-secondary text-xs flex items-center gap-1.5 font-bold"
+                onClick={handleSaveDraft}
+                className="px-3 py-2 bg-white border border-[#CFD8DC] hover:bg-gray-50 text-[#1D0A69] rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Previous Step</span>
+                <Save className="w-3.5 h-3.5 text-[#546E7A]" />
+                <span>Save Draft</span>
               </button>
-            ) : (
-              <div></div>
-            )}
+            </div>
 
-            {currentStep < 6 ? (
-              <button
-                type="button"
-                onClick={() => setCurrentStep(currentStep + 1)}
-                className="gov-btn gov-btn-primary text-xs font-bold px-6 py-2.5 flex items-center gap-2"
-              >
-                <span>Save & Proceed to Step {currentStep + 1}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onSubmitted}
-                className="bg-[#198754] hover:bg-[#157347] text-white font-bold text-xs px-8 py-3 rounded shadow-md flex items-center gap-2 transition-all"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Submit Application & Generate Sovereign Acknowledgement</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {currentStep === 5 && (
+                <button
+                  type="button"
+                  onClick={() => setDemoStep('upload_ocr')}
+                  className="bg-[#1D0A69] hover:bg-[#15074D] text-[#FFC107] border border-[#C85A17] font-bold text-xs px-4 py-2.5 rounded shadow-sm flex items-center gap-1.5"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Run Live OCR Pipeline</span>
+                </button>
+              )}
+
+              {currentStep < 6 ? (
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(currentStep + 1)}
+                  className="gov-btn gov-btn-primary text-xs font-bold px-6 py-2.5 flex items-center gap-2"
+                >
+                  <span>Continue to Step {currentStep + 1}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSubmitted();
+                    setDemoStep('upload_ocr');
+                  }}
+                  className="bg-[#198754] hover:bg-[#157347] text-white font-bold text-xs px-8 py-3 rounded shadow-md flex items-center gap-2 transition-all"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Submit & Ingest Evidence</span>
+                </button>
+              )}
+            </div>
           </div>
 
         </div>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useDemo } from './context/DemoContext';
 import { 
   FileText, CheckCircle, AlertTriangle, RefreshCw, Info,
-  ShieldCheck, ArrowUpRight, HelpCircle, XCircle
+  ShieldCheck, ArrowUpRight, HelpCircle, XCircle, ArrowRight
 } from 'lucide-react';
 
 interface OCRBoundingBox {
@@ -59,6 +60,14 @@ interface VerificationHistoryEvent {
 }
 
 export default function VerificationWorkbench() {
+  const { 
+    resolveConflict: demoResolveConflict, 
+    verification: demoVerification, 
+    setCurrentStep,
+    applicant,
+    ocrData
+  } = useDemo();
+
   const [selectedFieldCode, setSelectedFieldCode] = useState<string>('annual_family_income');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [activeTab, setActiveTab] = useState<'fields' | 'history' | 'eligibility'>('fields');
@@ -70,32 +79,32 @@ export default function VerificationWorkbench() {
     {
       field_code: 'annual_family_income',
       label: 'Annual Family Income',
-      declared_value: 500000,
+      declared_value: applicant.declaredIncome || 500000,
       declared_trust: 'APPLICANT_DECLARED (Rank 20)',
-      ocr_value: 450000,
+      ocr_value: ocrData.income || 450000,
       ocr_trust: 'OCR_PROVISIONAL (Rank 10)',
-      verified_value: null,
-      verified_trust: null,
-      status: 'CONFLICT',
+      verified_value: demoVerification.status === 'VERIFIED' ? 450000 : null,
+      verified_trust: demoVerification.status === 'VERIFIED' ? 'OFFICER_VERIFIED (Rank 60)' : null,
+      status: demoVerification.status === 'VERIFIED' ? 'VERIFIED' : 'CONFLICT',
       confidence: 0.94,
       evidence_text: 'वार्षिक पारिवारिक आय: 450000 रुपये',
       page_number: 1,
       block_id: 'block-income-01',
-      has_conflict: true,
+      has_conflict: demoVerification.status !== 'VERIFIED',
       conflict_type: 'MATERIAL_CONFLICT',
     },
     {
       field_code: 'certificate_number',
       label: 'Certificate Number',
-      declared_value: 'INC-2026-00124',
+      declared_value: 'TEST-2026-001',
       declared_trust: 'APPLICANT_DECLARED (Rank 20)',
-      ocr_value: 'INC-2026-00124',
+      ocr_value: 'TEST-2026-001',
       ocr_trust: 'OCR_PROVISIONAL (Rank 10)',
-      verified_value: 'INC-2026-00124',
+      verified_value: 'TEST-2026-001',
       verified_trust: 'OFFICER_VERIFIED (Rank 60)',
       status: 'VERIFIED',
       confidence: 0.98,
-      evidence_text: 'प्रमाण पत्र संख्या: INC-2026-00124',
+      evidence_text: 'प्रमाण पत्र संख्या: TEST-2026-001',
       page_number: 1,
       block_id: 'block-cert-02',
       has_conflict: false,
@@ -103,15 +112,15 @@ export default function VerificationWorkbench() {
     {
       field_code: 'issuing_authority',
       label: 'Issuing Authority',
-      declared_value: 'SDM Ranchi',
+      declared_value: 'Tehsildar Mandla',
       declared_trust: 'APPLICANT_DECLARED (Rank 20)',
-      ocr_value: 'कार्यालय अनुमंडल पदाधिकारी, रांची',
+      ocr_value: 'कार्यालय तहसीलदार, मंडला, मध्य प्रदेश',
       ocr_trust: 'OCR_PROVISIONAL (Rank 10)',
-      verified_value: null,
-      verified_trust: null,
-      status: 'PENDING',
-      confidence: 0.92,
-      evidence_text: 'कार्यालय अनुमंडल पदाधिकारी, रांची (SDM Ranchi)',
+      verified_value: 'कार्यालय तहसीलदार, मंडला, मध्य प्रदेश',
+      verified_trust: 'OFFICER_VERIFIED (Rank 60)',
+      status: 'VERIFIED',
+      confidence: 0.95,
+      evidence_text: 'कार्यालय तहसीलदार, मंडला, मध्य प्रदेश (Tehsildar Mandla)',
       page_number: 1,
       block_id: 'block-auth-03',
       has_conflict: false,
@@ -247,6 +256,9 @@ export default function VerificationWorkbench() {
       return f;
     }));
 
+    // Synchronize global SIH Demo State
+    demoResolveConflict(decision, reason);
+
     const newEvent: VerificationHistoryEvent = {
       id: `hist-${Date.now()}`,
       audit_event_id: auditUuid,
@@ -256,13 +268,13 @@ export default function VerificationWorkbench() {
       new_value: `${decision} -> ${chosenValue ? (typeof chosenValue === 'number' ? '₹' + chosenValue.toLocaleString('en-IN') : chosenValue) : 'PENDING_EVIDENCE'}`,
       previous_trust_rank: 20,
       verified_trust_rank: newStatus === 'VERIFIED' ? 60 : 20,
-      officer: 'officer_sharma',
+      officer: 'S. K. Mahapatra',
       role: 'SCRUTINY_OFFICER',
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC',
       reason: reason || `Conflict resolved using ${decision}`
     };
     setHistory(prev => [newEvent, ...prev]);
-    setActionSuccessMsg(`Conflict resolved: ${decision} recorded. Authoritative evidence committed to dossier. Audit ID: ${auditUuid.slice(0, 14)}...`);
+    setActionSuccessMsg(`Conflict resolved: ${decision} recorded. Authoritative evidence promoted to OFFICER_VERIFIED (Rank 60). Audit ID: ${auditUuid.slice(0, 14)}...`);
     setTimeout(() => setActionSuccessMsg(null), 5000);
   };
 
@@ -573,14 +585,14 @@ export default function VerificationWorkbench() {
               <div style={{ textAlign: 'center', borderBottom: '2px solid #cbd5e1', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
                 <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>भारत सरकार / GOVERNMENT OF INDIA</div>
                 <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e3a8a' }}>आय प्रमाण पत्र (INCOME CERTIFICATE)</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>कार्यालय अनुमंडल पदाधिकारी, रांची / Sub-Divisional Magistrate Office, Ranchi</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>कार्यालय तहसीलदार, मंडला / Office of Tehsildar, Mandla (Madhya Pradesh)</div>
               </div>
 
               {/* Document Body Lines */}
               <div style={{ lineHeight: '2.2', fontSize: '0.85rem' }}>
-                <div>प्रमाण पत्र संख्या / Certificate No: <strong>INC-2026-00124</strong></div>
-                <div>आवेदक का नाम / Applicant Name: <strong>श्री अर्जुन मुंडा (Shri Arjun Munda)</strong></div>
-                <div>पिता का नाम / Father's Name: <strong>श्री बिरसा मुंडा (Shri Birsa Munda)</strong></div>
+                <div>प्रमाण पत्र संख्या / Certificate No: <strong>TEST-2026-001</strong></div>
+                <div>आवेदक का नाम / Applicant Name: <strong>Demo ST Applicant</strong></div>
+                <div>पिता का नाम / Father's Name: <strong>श्री रामेश्वर मुंडा (Shri Rameshwar Munda)</strong></div>
                 <div>समुदाय / Category: <strong>अनुसूचित जनजाति (ST - Scheduled Tribe)</strong></div>
                 <div style={{ 
                   background: selectedFieldCode === 'annual_family_income' ? '#fef08a' : '#e0f2fe',
@@ -598,8 +610,8 @@ export default function VerificationWorkbench() {
                   [QR / DIGITAL SEAL]<br/><span style={{ fontSize: '0.65rem', color: '#64748b' }}>VERIFIED GOV ARCHIVE</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontStyle: 'italic', fontWeight: 600 }}>अनुमंडल पदाधिकारी / SDM</div>
-                  <div>रांची, झारखंड (Ranchi, Jharkhand)</div>
+                  <div style={{ fontStyle: 'italic', fontWeight: 600 }}>तहसीलदार / Tehsildar</div>
+                  <div>मंडला, मध्य प्रदेश (Mandla, MP)</div>
                 </div>
               </div>
 
@@ -684,6 +696,32 @@ export default function VerificationWorkbench() {
 
           {activeTab === 'fields' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {demoVerification.status === 'VERIFIED' && (
+                <div className="bg-[#E8F5E9] border-2 border-[#198754] p-3.5 rounded text-xs text-[#1B5E20] space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold flex items-center gap-1.5 text-sm">
+                      <CheckCircle className="w-4 h-4 text-[#198754]" />
+                      <span>✓ Evidence Verified by Authorized Officer</span>
+                    </div>
+                    <span className="font-mono text-[10px] bg-white text-[#198754] font-bold px-2 py-0.5 rounded border border-[#A5D6A7]">
+                      OFFICER_VERIFIED (Rank 60)
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Annual family income certified at <strong>₹4,50,000</strong>. Material conflict resolved and immutable audit record committed. Deterministic Rule Engine re-evaluated: <strong>Income Rule: PASS (₹4.5L &le; ₹6.0L)</strong>.
+                  </p>
+                  <div className="pt-1 flex justify-end">
+                    <button
+                      onClick={() => setCurrentStep('applicant_status')}
+                      className="bg-[#1D0A69] hover:bg-[#15074D] text-[#FFC107] font-bold px-3.5 py-2 rounded text-xs flex items-center gap-1.5 shadow-xs border border-[#C85A17] transition-all"
+                    >
+                      <span>View Updated Applicant Status & Eligibility (Step 7) →</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Field Cards */}
               {fields.map(field => {
                 const isSelected = field.field_code === selectedFieldCode;

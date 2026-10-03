@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
+import { DemoProvider, useDemo, DemoStep } from './context/DemoContext';
 import { AccessibilityToolbar } from './components/common/AccessibilityToolbar';
+import { PitchWalkthroughBar } from './components/common/PitchWalkthroughBar';
 import { GovernmentHeader } from './components/common/GovernmentHeader';
 import { GovernmentFooter } from './components/common/GovernmentFooter';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
@@ -12,10 +14,12 @@ import { LoginView } from './components/views/LoginView';
 import { RegistrationView } from './components/views/RegistrationView';
 import { ApplicantDashboardView } from './components/views/ApplicantDashboardView';
 import { ApplicationWizardView } from './components/views/ApplicationWizardView';
+import { DocumentUploadOcrView } from './components/views/DocumentUploadOcrView';
 import { DeficiencyResolutionView } from './components/views/DeficiencyResolutionView';
 import { GrievanceView } from './components/views/GrievanceView';
 import { OfficerDashboardView } from './components/views/OfficerDashboardView';
 import { VerificationWorkbenchView } from './components/views/VerificationWorkbenchView';
+import { ApplicantStatusView } from './components/views/ApplicantStatusView';
 import { AdminDashboardView } from './components/views/AdminDashboardView';
 import { PwaOfflineBanner } from './components/common/PwaOfflineBanner';
 import { SchemeInfo, OFFICIAL_MOTA_SCHEMES } from './theme/tokens';
@@ -32,6 +36,8 @@ export type PortalTab =
   | 'register' 
   | 'dashboard' 
   | 'wizard' 
+  | 'upload_ocr'
+  | 'applicant_status'
   | 'deficiency' 
   | 'grievance' 
   | 'officer' 
@@ -40,8 +46,18 @@ export type PortalTab =
 
 const MainPortalContent: React.FC = () => {
   const { language } = useLanguage();
+  const { currentStep, setCurrentStep } = useDemo();
   const [activeTab, setActiveTab] = useState<PortalTab>('home');
   const [selectedScheme, setSelectedScheme] = useState<SchemeInfo | null>(OFFICIAL_MOTA_SCHEMES[2]); // Default Top Class
+
+  // Sync with SIH Pitch Demo Stepper
+  useEffect(() => {
+    if (currentStep === 'officer_queue') {
+      setActiveTab('officer');
+    } else {
+      setActiveTab(currentStep as PortalTab);
+    }
+  }, [currentStep]);
 
   const handleSelectScheme = (scheme: SchemeInfo) => {
     setSelectedScheme(scheme);
@@ -51,6 +67,16 @@ const MainPortalContent: React.FC = () => {
   const handleApplyScheme = (scheme: SchemeInfo) => {
     setSelectedScheme(scheme);
     setActiveTab('wizard');
+    setCurrentStep('wizard');
+  };
+
+  const handleTabNavigate = (t: PortalTab) => {
+    setActiveTab(t);
+    if (t === 'home' || t === 'schemes' || t === 'wizard' || t === 'upload_ocr' || t === 'workbench' || t === 'applicant_status') {
+      setCurrentStep(t as DemoStep);
+    } else if (t === 'officer') {
+      setCurrentStep('officer_queue');
+    }
   };
 
   return (
@@ -60,6 +86,9 @@ const MainPortalContent: React.FC = () => {
 
       {/* 1. Top GIGW 3.0 Accessibility Toolbar */}
       <AccessibilityToolbar />
+
+      {/* 1.5 SIH 2026 Interactive Pitch Demonstration Stepper Ribbon */}
+      <PitchWalkthroughBar />
 
       {/* 2. Official Ministry of Tribal Affairs Sovereign Header */}
       <GovernmentHeader />
@@ -73,7 +102,7 @@ const MainPortalContent: React.FC = () => {
         <div className="gov-container flex items-center justify-between">
           <div className="flex items-center gap-1 overflow-x-auto text-xs font-bold">
             <button
-              onClick={() => setActiveTab('home')}
+              onClick={() => handleTabNavigate('home')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'home'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -85,7 +114,7 @@ const MainPortalContent: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('schemes')}
+              onClick={() => handleTabNavigate('schemes')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'schemes' || activeTab === 'scheme_detail'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -97,7 +126,7 @@ const MainPortalContent: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => handleTabNavigate('dashboard')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'dashboard' || activeTab === 'deficiency'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -110,7 +139,7 @@ const MainPortalContent: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('wizard')}
+              onClick={() => handleTabNavigate('wizard')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'wizard'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -121,7 +150,7 @@ const MainPortalContent: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('officer')}
+              onClick={() => handleTabNavigate('officer')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'officer' || activeTab === 'workbench'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -133,7 +162,7 @@ const MainPortalContent: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('admin')}
+              onClick={() => handleTabNavigate('admin')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'admin'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -145,7 +174,7 @@ const MainPortalContent: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('grievance')}
+              onClick={() => handleTabNavigate('grievance')}
               className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 transition-colors ${
                 activeTab === 'grievance'
                   ? 'border-[#FFC107] text-[#FFC107] bg-[#15074D]'
@@ -159,7 +188,7 @@ const MainPortalContent: React.FC = () => {
 
           {/* Right Action: Login / OTR */}
           <button
-            onClick={() => setActiveTab('login')}
+            onClick={() => handleTabNavigate('login')}
             className={`flex items-center gap-1.5 py-1 px-3 rounded text-xs font-bold border transition-colors ${
               activeTab === 'login' || activeTab === 'register'
                 ? 'bg-[#FFC107] text-[#150202] border-[#FFC107]'
@@ -231,6 +260,10 @@ const MainPortalContent: React.FC = () => {
           />
         )}
 
+        {activeTab === 'upload_ocr' && (
+          <DocumentUploadOcrView />
+        )}
+
         {activeTab === 'deficiency' && (
           <DeficiencyResolutionView
             onBack={() => setActiveTab('dashboard')}
@@ -250,9 +283,13 @@ const MainPortalContent: React.FC = () => {
 
         {activeTab === 'workbench' && (
           <VerificationWorkbenchView
-            applicationId="MOTA/2026/TC/09841"
+            applicationId="APP-2026-001DB3"
             onBackToQueue={() => setActiveTab('officer')}
           />
+        )}
+
+        {activeTab === 'applicant_status' && (
+          <ApplicantStatusView />
         )}
 
         {activeTab === 'admin' && (
@@ -266,7 +303,7 @@ const MainPortalContent: React.FC = () => {
       {/* 6. PWA Mobile Bottom Navigation */}
       <MobileBottomNav
         activeTab={activeTab}
-        onSelectTab={(t) => setActiveTab(t as any)}
+        onSelectTab={(t) => handleTabNavigate(t as any)}
       />
     </div>
   );
@@ -276,7 +313,9 @@ export default function App() {
   return (
     <LanguageProvider>
       <AccessibilityProvider>
-        <MainPortalContent />
+        <DemoProvider>
+          <MainPortalContent />
+        </DemoProvider>
       </AccessibilityProvider>
     </LanguageProvider>
   );

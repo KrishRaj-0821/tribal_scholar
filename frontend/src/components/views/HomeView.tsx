@@ -93,22 +93,32 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </p>
               </div>
 
-              {/* Action Group */}
+              {/* Primary & Secondary CTAs */}
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
+                  id="cta-find-scholarship"
                   onClick={() => onNavigateTab('schemes')}
-                  className="gov-btn gov-btn-primary px-6 py-3 text-sm font-bold shadow-sm"
+                  className="gov-btn gov-btn-primary px-6 py-3 text-sm font-bold shadow-sm flex items-center gap-2"
                 >
-                  <Search className="w-4 h-4" />
-                  <span>{language === 'hi' ? 'सभी 5 योजनाएं देखें' : 'Explore All 5 Schemes'}</span>
+                  <Search className="w-4 h-4 text-[#FFC107]" />
+                  <span>{language === 'hi' ? 'मेरी छात्रवृत्ति खोजें' : 'Find My Scholarship'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <button
-                  onClick={() => onNavigateTab('login')}
-                  className="gov-btn gov-btn-secondary px-6 py-3 text-sm font-bold"
+                  id="cta-track-application"
+                  onClick={() => onNavigateTab('applicant_status')}
+                  className="gov-btn gov-btn-secondary px-6 py-3 text-sm font-bold flex items-center gap-2"
                 >
-                  <span>{language === 'hi' ? 'नागरिक प्रवेश / नया OTR' : 'Citizen Login / Register (OTR)'}</span>
+                  <span>{language === 'hi' ? 'आवेदन स्थिति ट्रैक करें' : 'Track Application'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => onNavigateTab('wizard')}
+                  className="bg-[#1D0A69] border border-[#FFC107] text-[#FFC107] hover:bg-[#FFC107] hover:text-[#1D0A69] px-4 py-3 text-xs font-bold rounded flex items-center gap-1.5 transition-colors"
+                >
+                  <span>{language === 'hi' ? 'सिंथेटिक डेमो आवेदन शुरू करें' : 'Start Demo Application (Mandla ST)'}</span>
                 </button>
               </div>
 
@@ -149,9 +159,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <form 
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (trackAppNo.trim()) {
-                      onNavigateTab('dashboard');
-                    }
+                    onNavigateTab('applicant_status');
                   }} 
                   className="space-y-4"
                 >

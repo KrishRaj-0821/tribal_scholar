@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useDemo } from '../../context/DemoContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { TribalPattern } from '../common/TribalPattern';
 import { 
@@ -15,10 +16,31 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
   onOpenWorkbench
 }) => {
   const { language } = useLanguage();
+  const { applicant, verification } = useDemo();
   const [filterScheme, setFilterScheme] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const isVerified = verification.status === 'VERIFIED';
+
   const scrutinyQueue = [
+    {
+      id: applicant.applicationId || 'APP-2026-001DB3',
+      applicantName: applicant.name || 'Demo ST Applicant',
+      otrNo: applicant.otrNo || 'OTR-2026-ST-884912',
+      scheme: 'Top Class Education for ST Students',
+      schemeCode: 'TOP-05',
+      institution: applicant.institution || 'Synthetic Demo University (IIT Indore)',
+      submissionDate: 'Today (Live Scenario)',
+      status: isVerified ? ('VERIFIED' as const) : ('DEFICIENT' as const),
+      statusLabel: isVerified 
+        ? 'Officer Verified (₹4,50,000 Promoted)' 
+        : 'Material Income Conflict (Pending Scrutiny)',
+      casteStatus: 'VERIFIED',
+      incomeStatus: isVerified ? 'VERIFIED' : 'MATERIAL_CONFLICT',
+      bonafideStatus: 'VERIFIED',
+      actionUrgency: 'HIGH',
+      isDemoTarget: true
+    },
     {
       id: 'MOTA/2026/TC/09841',
       applicantName: 'Rajeshwar Soren',
@@ -32,7 +54,8 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
       casteStatus: 'VERIFIED',
       incomeStatus: 'OUTDATED_FY',
       bonafideStatus: 'VERIFIED',
-      actionUrgency: 'HIGH'
+      actionUrgency: 'HIGH',
+      isDemoTarget: false
     },
     {
       id: 'MOTA/2026/NFST/04112',
@@ -47,7 +70,8 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
       casteStatus: 'VERIFIED',
       incomeStatus: 'VERIFIED',
       bonafideStatus: 'VERIFIED',
-      actionUrgency: 'NORMAL'
+      actionUrgency: 'NORMAL',
+      isDemoTarget: false
     },
     {
       id: 'MOTA/2026/PMS/88210',
@@ -62,7 +86,8 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
       casteStatus: 'VERIFIED',
       incomeStatus: 'VERIFIED',
       bonafideStatus: 'VERIFIED',
-      actionUrgency: 'COMPLETED'
+      actionUrgency: 'COMPLETED',
+      isDemoTarget: false
     },
     {
       id: 'MOTA/2026/NOS/00219',
@@ -77,7 +102,8 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
       casteStatus: 'VERIFIED',
       incomeStatus: 'VERIFIED',
       bonafideStatus: 'VERIFIED',
-      actionUrgency: 'NORMAL'
+      actionUrgency: 'NORMAL',
+      isDemoTarget: false
     }
   ];
 
@@ -226,61 +252,85 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#CFD8DC]">
-              {filteredQueue.map((item) => (
-                <tr 
-                  key={item.id} 
-                  className={`hover:bg-[#F8F9FA] transition-colors ${
-                    item.id === 'MOTA/2026/TC/09841' ? 'bg-[#FFFDE7]/50' : ''
-                  }`}
-                >
-                  <td className="p-3">
-                    <div className="font-mono font-bold text-[#1D0A69]">{item.id}</div>
-                    <div className="text-[11px] text-[#546E7A] font-mono">{item.otrNo}</div>
-                  </td>
-
-                  <td className="p-3">
-                    <div className="font-bold text-[#150202]">{item.applicantName}</div>
-                    <div className="text-[11px] text-[#546E7A]">Santhal (ST) • Jharkhand</div>
-                  </td>
-
-                  <td className="p-3">
-                    <div className="font-semibold text-[#1D0A69]">{item.scheme}</div>
-                    <div className="text-[11px] text-[#546E7A]">{item.institution}</div>
-                  </td>
-
-                  <td className="p-3 text-[#546E7A] whitespace-nowrap">
-                    {item.submissionDate}
-                  </td>
-
-                  <td className="p-3">
-                    <div className="space-y-0.5 text-[11px]">
-                      <div>Caste: <span className="text-[#198754] font-bold">✓ Verified</span></div>
-                      <div>
-                        Income:{' '}
-                        {item.incomeStatus === 'OUTDATED_FY' ? (
-                          <span className="text-[#C85A17] font-bold">! Outdated FY (Rule 4.2)</span>
-                        ) : (
-                          <span className="text-[#198754] font-bold">✓ Current FY Verified</span>
+              {filteredQueue.map((item) => {
+                const isTarget = (item as any).isDemoTarget;
+                return (
+                  <tr 
+                    key={item.id} 
+                    className={`transition-colors ${
+                      isTarget 
+                        ? 'bg-[#FFF9C4]/40 border-l-4 border-l-[#C85A17] hover:bg-[#FFF9C4]/70' 
+                        : item.id === 'MOTA/2026/TC/09841' 
+                        ? 'bg-[#FFFDE7]/50 hover:bg-[#F8F9FA]' 
+                        : 'hover:bg-[#F8F9FA]'
+                    }`}
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="font-mono font-bold text-[#1D0A69]">{item.id}</div>
+                        {isTarget && (
+                          <span className="bg-[#C85A17] text-white font-extrabold px-1.5 py-0.2 rounded text-[9px] uppercase">
+                            HIGH PRIORITY
+                          </span>
                         )}
                       </div>
-                    </div>
-                  </td>
+                      <div className="text-[11px] text-[#546E7A] font-mono">{item.otrNo}</div>
+                    </td>
 
-                  <td className="p-3">
-                    <StatusBadge status={item.status} customLabel={item.statusLabel} />
-                  </td>
+                    <td className="p-3">
+                      <div className="font-bold text-[#150202]">{item.applicantName}</div>
+                      <div className="text-[11px] text-[#546E7A]">
+                        {isTarget ? 'Scheduled Tribe • Mandla (MP)' : 'Santhal (ST) • Jharkhand'}
+                      </div>
+                    </td>
 
-                  <td className="p-3 text-right">
-                    <button
-                      onClick={() => onOpenWorkbench(item.id)}
-                      className="inline-flex items-center gap-1.5 bg-[#1D0A69] hover:bg-[#15074D] text-white text-xs font-bold py-1.5 px-3.5 rounded shadow-xs transition-colors"
-                    >
-                      <span>Inspect Evidence</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="p-3">
+                      <div className="font-semibold text-[#1D0A69]">{item.scheme}</div>
+                      <div className="text-[11px] text-[#546E7A]">{item.institution}</div>
+                    </td>
+
+                    <td className="p-3 text-[#546E7A] whitespace-nowrap">
+                      {item.submissionDate}
+                    </td>
+
+                    <td className="p-3">
+                      <div className="space-y-0.5 text-[11px]">
+                        <div>Caste: <span className="text-[#198754] font-bold">✓ Verified</span></div>
+                        <div>
+                          Income:{' '}
+                          {item.incomeStatus === 'MATERIAL_CONFLICT' ? (
+                            <span className="text-[#C85A17] font-bold bg-[#FFEBEE] px-1.5 py-0.5 rounded border border-[#FFCDD2]">
+                              ⚠ Discrepancy (Declared ₹5L vs OCR ₹4.5L)
+                            </span>
+                          ) : item.incomeStatus === 'OUTDATED_FY' ? (
+                            <span className="text-[#C85A17] font-bold">! Outdated FY (Rule 4.2)</span>
+                          ) : (
+                            <span className="text-[#198754] font-bold">✓ Verified Evidence</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <StatusBadge status={item.status} customLabel={item.statusLabel} />
+                    </td>
+
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => onOpenWorkbench(item.id)}
+                        className={`inline-flex items-center gap-1.5 text-xs font-bold py-1.5 px-3.5 rounded shadow-xs transition-colors ${
+                          isTarget && !isVerified
+                            ? 'bg-[#C85A17] hover:bg-[#A8450D] text-white animate-pulse'
+                            : 'bg-[#1D0A69] hover:bg-[#15074D] text-white'
+                        }`}
+                      >
+                        <span>{isTarget ? (isVerified ? 'View Verified Record' : 'Review Conflict →') : 'Inspect Evidence'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

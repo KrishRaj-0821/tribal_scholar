@@ -1,7 +1,8 @@
 import React from 'react';
 import VerificationWorkbench from '../../VerificationWorkbench';
+import { useDemo } from '../../context/DemoContext';
 import { 
-  ArrowLeft, Clock, ChevronRight 
+  ArrowLeft, Clock, ChevronRight, AlertTriangle, CheckCircle
 } from 'lucide-react';
 
 interface VerificationWorkbenchViewProps {
@@ -10,9 +11,11 @@ interface VerificationWorkbenchViewProps {
 }
 
 export const VerificationWorkbenchView: React.FC<VerificationWorkbenchViewProps> = ({
-  applicationId = 'MOTA/2026/TC/09841',
+  applicationId = 'APP-2026-001DB3',
   onBackToQueue
 }) => {
+  const { applicant, verification } = useDemo();
+  const isVerified = verification.status === 'VERIFIED';
 
   return (
     <div className="space-y-4 pb-12">
@@ -32,7 +35,7 @@ export const VerificationWorkbenchView: React.FC<VerificationWorkbenchViewProps>
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#CFD8DC]">
               <span>Scrutiny Queue</span>
               <ChevronRight className="w-3 h-3 text-[#90A4AE]" />
-              <span className="font-mono text-[#FFC107] font-bold">{applicationId}</span>
+              <span className="font-mono text-[#FFC107] font-bold">{applicant.applicationId || applicationId}</span>
               <ChevronRight className="w-3 h-3 text-[#90A4AE]" />
               <span className="text-white font-semibold">Evidence Scrutiny & OCR Audit</span>
             </div>
@@ -41,8 +44,8 @@ export const VerificationWorkbenchView: React.FC<VerificationWorkbenchViewProps>
           {/* Right: Authenticated Officer Context & Live Session Timer */}
           <div className="flex items-center gap-4 text-xs">
             <div className="hidden md:block text-right">
-              <div className="font-bold text-white">S. K. Mahapatra (District Scrutiny Officer)</div>
-              <div className="text-[11px] text-[#CFD8DC]">District Welfare Office, Ranchi, Jharkhand</div>
+              <div className="font-bold text-white">{verification.officer || 'S. K. Mahapatra (District Scrutiny Officer)'}</div>
+              <div className="text-[11px] text-[#CFD8DC]">District Welfare Office, Mandla, Madhya Pradesh</div>
             </div>
 
             <div className="flex items-center gap-1.5 bg-[#15074D] border border-[#546E7A] px-2.5 py-1 rounded font-mono text-[#FFC107] text-xs">
@@ -59,24 +62,32 @@ export const VerificationWorkbenchView: React.FC<VerificationWorkbenchViewProps>
           <div className="flex flex-wrap items-center gap-4 text-xs">
             <div>
               <span className="text-[10px] text-[#546E7A] uppercase font-bold block">Candidate:</span>
-              <strong className="text-[#150202] text-sm">Rajeshwar Soren (OTR-2026-ST-884912)</strong>
+              <strong className="text-[#150202] text-sm">{applicant.name || 'Demo ST Applicant'} ({applicant.otrNo || 'OTR-2026-ST-884912'})</strong>
             </div>
 
             <div className="border-l border-[#CFD8DC] pl-4">
-              <span className="text-[10px] text-[#546E7A] uppercase font-bold block">Scheme:</span>
-              <strong className="text-[#1D0A69]">Top Class Education for ST Students (MOTA-SCH-TOP-05)</strong>
+              <span className="text-[10px] text-[#546E7A] uppercase font-bold block">Target Scheme:</span>
+              <strong className="text-[#1D0A69]">Top Class Education for ST Students (TOP-05)</strong>
             </div>
 
             <div className="border-l border-[#CFD8DC] pl-4">
               <span className="text-[10px] text-[#546E7A] uppercase font-bold block">Enrolled Institution:</span>
-              <strong className="text-[#150202]">IIT Kharagpur (B.Tech Computer Science)</strong>
+              <strong className="text-[#150202]">{applicant.institution || 'Synthetic Demo University (IIT Indore)'}</strong>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="gov-badge gov-badge-warning text-xs font-bold">
-              Deficiency Raised (Rule 4.2)
-            </span>
+            {isVerified ? (
+              <span className="gov-badge gov-badge-success text-xs font-bold flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5 text-[#198754]" />
+                <span>OFFICER VERIFIED (Conflict Resolved)</span>
+              </span>
+            ) : (
+              <span className="gov-badge gov-badge-danger text-xs font-bold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-[#C85A17]" />
+                <span>MATERIAL CONFLICT (Pending Review)</span>
+              </span>
+            )}
           </div>
         </div>
       </div>

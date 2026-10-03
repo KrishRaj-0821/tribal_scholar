@@ -407,3 +407,46 @@ def resolve_conflict_api_view(request, queue_item_id):
         return Response(resp_serializer.data, status=status.HTTP_200_OK)
     except ValidationError as e:
         return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def demo_reset_api_view(request):
+    """
+    POST /api/v1/verification/demo/reset/
+    Seeds or resets the deterministic SIH demo scenario (APP-2026-001DB3).
+    """
+    from .demo_service import DemoScenarioService
+    result = DemoScenarioService.reset_demo_scenario()
+    return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def demo_status_api_view(request):
+    """
+    GET /api/v1/verification/demo/status/
+    Retrieves the live state of the demo scenario.
+    """
+    from .demo_service import DEMO_APPLICATION_NUMBER, DemoScenarioService
+    from apps.applications.models import Application
+    from apps.verification.models import VerificationQueueItem
+
+    app = Application.objects.filter(application_number=DEMO_APPLICATION_NUMBER).first()
+    if not app:
+        DemoScenarioService.reset_demo_scenario()
+        app = Application.objects.get(application_number=DEMO_APPLICATION_NUMBER)
+
+    queue_item = VerificationQueueItem.objects.filter(application=app).first()
+    latest_eval = app.eligibility_evaluations.order_by('-evaluated_at').first()
+
+    return Response({
+        "application_id": str(app.id),
+        "application_number": app.application_number,
+        "queue_item_id": str(queue_item.id) if queue_item else None,
+        "queue_status": queue_item.status if queue_item else None,
+        "conflict_type": queue_item.conflict_type if queue_item else None,
+        "eligibility_status": latest_eval.result.get("status") if (latest_eval and isinstance(latest_eval.result, dict)) else "NEEDS_REVIEW",
+        "evaluations": latest_eval.result.get("evaluations", []) if (latest_eval and isinstance(latest_eval.result, dict)) else []
+    }, status=status.HTTP_200_OK)
+
