@@ -41,11 +41,14 @@ class AuditAction(models.TextChoices):
     FIELD_EXTRACTED = 'FIELD_EXTRACTED', 'Provisional Field Extracted'
     FIELD_CONFLICT_DETECTED = 'FIELD_CONFLICT_DETECTED', 'Field Conflict Detected'
     DOCUMENT_VERIFICATION_STARTED = 'DOCUMENT_VERIFICATION_STARTED', 'Document Verification Started'
+    DOCUMENT_EVIDENCE_VERIFIED = 'DOCUMENT_EVIDENCE_VERIFIED', 'Document Evidence Verified by Officer'
     FIELD_VERIFIED = 'FIELD_VERIFIED', 'Field Verified by Officer'
     FIELD_REJECTED = 'FIELD_REJECTED', 'Field Rejected by Officer'
     FIELD_CONFLICT_RESOLVED = 'FIELD_CONFLICT_RESOLVED', 'Field Conflict Resolved by Officer'
     DOCUMENT_VERIFICATION_COMPLETED = 'DOCUMENT_VERIFICATION_COMPLETED', 'Document Verification Completed'
     DOCUMENT_VERIFICATION_REOPENED = 'DOCUMENT_VERIFICATION_REOPENED', 'Document Verification Reopened'
+    VERIFICATION_ASSIGNED = 'VERIFICATION_ASSIGNED', 'Verification Queue Item Assigned'
+    VERIFICATION_ESCALATED = 'VERIFICATION_ESCALATED', 'Verification Queue Item Escalated'
 
 class AuditQuerySet(models.QuerySet):
     """Prevent bulk modifications or deletions on audit records."""

@@ -21,6 +21,8 @@ urlpatterns = [
     path('documents/<str:pk>/history/', DocumentVerificationViewSet.as_view({'get': 'get_verification_history'}), name='verification-doc-history-str'),
     path('documents/<uuid:pk>/reopen/', DocumentVerificationViewSet.as_view({'post': 'reopen_verification'}), name='verification-doc-reopen'),
     path('documents/<str:pk>/reopen/', DocumentVerificationViewSet.as_view({'post': 'reopen_verification'}), name='verification-doc-reopen-str'),
+    path('documents/<uuid:pk>/verify-document/', DocumentVerificationViewSet.as_view({'post': 'verify_document'}), name='verification-doc-verify-document'),
+    path('documents/<str:pk>/verify-document/', DocumentVerificationViewSet.as_view({'post': 'verify_document'}), name='verification-doc-verify-document-str'),
     path('documents/<uuid:pk>/complete/', DocumentVerificationViewSet.as_view({'post': 'complete_verification'}), name='verification-doc-complete'),
     path('documents/<str:pk>/complete/', DocumentVerificationViewSet.as_view({'post': 'complete_verification'}), name='verification-doc-complete-str'),
 

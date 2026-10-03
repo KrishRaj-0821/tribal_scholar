@@ -100,6 +100,15 @@ class FieldTrustResolver:
         return new_val
 
 
+class DynamicFormService:
+    """
+    Facade service for dynamic form processing and effective field value resolution.
+    """
+    @staticmethod
+    def get_effective_field_values(application: Application) -> Dict[str, Dict[str, Any]]:
+        return FieldTrustResolver.get_effective_values(application)
+
+
 class ApplicationFormValidator:
     """
     Authoritative server-side validation against ApplicationFieldDefinition metadata.

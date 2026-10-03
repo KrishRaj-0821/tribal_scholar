@@ -9,12 +9,21 @@ from apps.applications.models import (
     FieldDataType
 )
 from apps.schemes.models import Scheme, SchemeVersion
-from apps.users.models import User, UserRole, ApplicantProfile
+from apps.accounts.models import User, UserRole
+from apps.applicants.models import ApplicantProfile
 from apps.applications.form_services import DynamicFormService
+
+
+from apps.documents.models import SourceDocument, SourceType, SourceDocumentStatus
+from apps.workflow.models import WorkflowDefinition, WorkflowState
 
 
 @pytest.fixture
 def scheme_setup(db):
+    User.objects.filter(username="trust_applicant").delete()
+    Scheme.objects.filter(code="TRUST_SCHEME").delete()
+    SourceDocument.objects.filter(checksum="7" * 64).delete()
+
     user = User.objects.create_user(
         username="trust_applicant",
         email="trust@tribal.gov.in",
@@ -26,22 +35,47 @@ def scheme_setup(db):
         community="ST",
         annual_family_income=250000
     )
+    source_doc = SourceDocument.objects.create(
+        title="Trust Test Source",
+        source_type=SourceType.GUIDELINE,
+        academic_year="2026-27",
+        checksum="7" * 64,
+        content_hash="7" * 64,
+        status=SourceDocumentStatus.VERIFIED
+    )
     scheme = Scheme.objects.create(code="TRUST_SCHEME", name="Trust Test Scheme")
     version = SchemeVersion.objects.create(
         scheme=scheme,
         academic_year="2026-27",
-        version_number="1.0"
+        version_number=1,
+        source_document=source_doc,
+        status="ACTIVE"
+    )
+    wf = WorkflowDefinition.objects.create(
+        name="Trust Workflow",
+        scheme_version=version,
+        active=True
+    )
+    draft_state = WorkflowState.objects.create(
+        workflow=wf,
+        code="DRAFT",
+        display_name="Draft",
+        sequence=1
     )
     fdef = ApplicationFieldDefinition.objects.create(
         scheme_version=version,
         field_code="annual_family_income",
         label="Annual Family Income",
-        data_type=FieldDataType.CURRENCY
+        data_type=FieldDataType.CURRENCY,
+        source_document=source_doc,
+        source_excerpt="Official guideline section 4",
+        status="ACTIVE"
     )
     app = Application.objects.create(
         applicant=profile,
         scheme_version=version,
-        application_number="MOTA/TRUST/001"
+        application_number="MOTA/TRUST/001",
+        current_state=draft_state
     )
     return app, fdef
 

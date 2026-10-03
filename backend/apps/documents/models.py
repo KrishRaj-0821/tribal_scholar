@@ -323,13 +323,18 @@ class ApplicantDocument(models.Model):
             DocumentLifecycleStatus.PROCESSING,
             DocumentLifecycleStatus.QUARANTINED,
             DocumentLifecycleStatus.REVOKED,
+            DocumentLifecycleStatus.VERIFICATION_PENDING,
+            DocumentLifecycleStatus.VERIFIED,
         },
         DocumentLifecycleStatus.PROCESSING: {
             DocumentLifecycleStatus.PROCESSED,
             DocumentLifecycleStatus.REVOKED,
+            DocumentLifecycleStatus.VERIFICATION_PENDING,
+            DocumentLifecycleStatus.VERIFIED,
         },
         DocumentLifecycleStatus.PROCESSED: {
             DocumentLifecycleStatus.VERIFICATION_PENDING,
+            DocumentLifecycleStatus.VERIFIED,
             DocumentLifecycleStatus.REVOKED,
         },
         DocumentLifecycleStatus.VERIFICATION_PENDING: {

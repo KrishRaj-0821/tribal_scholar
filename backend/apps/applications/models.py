@@ -339,7 +339,7 @@ class ApplicationFieldValue(models.Model):
         if self.source in canon_src:
             self.source = canon_src[self.source]
 
-        if not self.pk and self.verification_status == FieldValueVerificationStatus.UNVERIFIED:
+        if (self._state.adding or not self.pk) and self.verification_status == FieldValueVerificationStatus.UNVERIFIED:
             if self.source in (FieldValueSource.OCR_PROVISIONAL, 'OCR'):
                 self.verification_status = FieldValueVerificationStatus.PROVISIONALLY_EXTRACTED
             elif self.source in (FieldValueSource.VERIFIED_DOCUMENT, 'OCR_VERIFIED'):
