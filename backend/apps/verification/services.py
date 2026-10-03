@@ -542,6 +542,12 @@ class DocumentVerificationService:
             except Exception:
                 pass
 
+            try:
+                from apps.notifications.services import NotificationService
+                NotificationService.send_verification_completed(app)
+            except Exception as notif_err:
+                logger.warning("Failed to queue verification completed SMS for application %s: %s", app.id, notif_err)
+
         return {
             "document_id": str(doc.id),
             "status": "VERIFIED",
@@ -748,6 +754,17 @@ class DocumentVerificationService:
         except Exception:
             pass
 
+        # Trigger SMS notification to applicant regarding verification outcome
+        if app:
+            try:
+                from apps.notifications.services import NotificationService
+                if queue_item.status == VerificationStatus.VERIFIED:
+                    NotificationService.send_verification_completed(app)
+                elif decision_action in (VerificationDecisionAction.REQUEST_CORRECTION, VerificationDecisionAction.NEEDS_MORE_EVIDENCE):
+                    NotificationService.send_need_more_evidence(app)
+            except Exception as notif_err:
+                logger.warning("Failed to queue verification SMS for application %s: %s", app.id, notif_err)
+
         return record
 
     @classmethod
@@ -791,6 +808,14 @@ class DocumentVerificationService:
                 after_json={"status": VerificationStatus.NEEDS_MORE_EVIDENCE, "correlation_id": corr_id},
                 reason=reason
             )
+
+            # Queue SMS notification to applicant regarding deficiency
+            if item.application:
+                try:
+                    from apps.notifications.services import NotificationService
+                    NotificationService.send_need_more_evidence(item.application)
+                except Exception as notif_err:
+                    logger.warning("Failed to queue deficiency SMS for application %s: %s", item.application_id, notif_err)
 
         return item
 

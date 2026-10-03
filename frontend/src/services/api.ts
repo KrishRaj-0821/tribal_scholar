@@ -148,6 +148,24 @@ export const authApi = {
   getMe: async () => {
     return await fetchApi<{ user: any; token?: string }>('/api/v1/auth/me/');
   },
+
+  requestOTP: async (mobile: string) => {
+    return await fetchApi<{ message: string; mobile_masked: string }>('/api/v1/auth/request-otp/', {
+      method: 'POST',
+      body: JSON.stringify({ mobile }),
+    });
+  },
+
+  verifyOTP: async (mobile: string, otp: string) => {
+    const res = await fetchApi<{ message: string; token: string; user: any }>('/api/v1/auth/verify-otp/', {
+      method: 'POST',
+      body: JSON.stringify({ mobile, otp }),
+    });
+    if (res.token) {
+      setStoredToken(res.token);
+    }
+    return res;
+  },
 };
 
 // ----------------------------------------------------------------------
@@ -332,3 +350,32 @@ export const officerApi = {
     return await fetchApi<any>('/api/v1/verification/demo/status/');
   },
 };
+
+// ----------------------------------------------------------------------
+// Notification & SMS Ledger Service
+// ----------------------------------------------------------------------
+export interface SMSNotificationRecord {
+  id: string;
+  notification_type: string;
+  recipient_phone_masked: string;
+  status: 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'RETRY_PENDING' | 'DEV_SKIPPED';
+  provider: string;
+  provider_request_id?: string;
+  message_length: number;
+  failure_reason?: string;
+  created_at: string;
+  sent_at?: string;
+}
+
+export const notificationsApi = {
+  getApplicationSMS: async (applicationId: string) => {
+    return await fetchApi<SMSNotificationRecord[]>(`/api/v1/applications/${applicationId}/notifications/`);
+  },
+  retrySMS: async (notificationId: string) => {
+    return await fetchApi<SMSNotificationRecord>(`/api/v1/notifications/${notificationId}/retry/`, {
+      method: 'POST',
+    });
+  },
+};
+
+

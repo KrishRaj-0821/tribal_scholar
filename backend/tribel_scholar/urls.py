@@ -84,6 +84,7 @@ urlpatterns = [
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/applicants/', include('apps.applicants.urls')),
     path('api/v1/verification/', include('apps.verification.urls')),
+    path('api/v1/', include('apps.notifications.urls')),
     path('api/v1/', include(router.urls)),
     path('api/v1/integrations/status/', IntegrationStatusView.as_view(), name='integration-status'),
 ]

@@ -299,6 +299,16 @@ export const ApplicantDashboardView: React.FC<ApplicantDashboardViewProps> = () 
                   </div>
                 </div>
 
+                {/* SMS Notification Status Badge */}
+                <div className="mt-3 flex items-center justify-between bg-[#F8F9FA] px-3 py-1.5 rounded border border-[#ECEFF1] text-[11px]">
+                  <div className="flex items-center gap-1.5 text-[#1B5E20] font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#198754]" />
+                    <span>Notification: ✓ SMS sent (******4912)</span>
+                  </div>
+                  <span className="text-[10px] text-[#546E7A]">Fast2SMS Delivery Confirmed</span>
+                </div>
+
+
                 {/* Bottom Action */}
                 <div className="mt-4 pt-3 border-t border-[#ECEFF1] flex items-center justify-between">
                   <span className="text-[11px] text-[#78909C]">

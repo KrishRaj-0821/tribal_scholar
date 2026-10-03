@@ -421,9 +421,15 @@ class SubmissionService:
                 entity_id=str(app.id),
                 action=AuditAction.APPLICATION_SUBMITTED,
                 before_json={"state": prev_state.code, "revision": app.revision_number - 1},
-                after_json={"state": submitted_state.code, "revision": app.revision_number, "snapshot_hash": snap_hash},
                 reason="Application submitted with verified document manifest and input snapshot."
             )
+
+            # 9.5. Queue Asynchronous SMS Notification via Fast2SMS
+            try:
+                from apps.notifications.services import NotificationService
+                NotificationService.send_application_submitted(app)
+            except Exception as notif_err:
+                logger.warning("Failed to queue submission SMS for application %s: %s", app.id, notif_err)
 
             # 10. Generate Submission Receipt
             receipt = {

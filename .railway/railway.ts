@@ -59,6 +59,10 @@ export default defineRailway(() => {
       MALWARE_SCANNER_BACKEND: "clamav",
       CLAMAV_HOST: "127.0.0.1",
       CLAMAV_PORT: "3310",
+      FAST2SMS_API_KEY: preserve(),
+      FAST2SMS_API_URL: "https://www.fast2sms.com/dev/bulkV2",
+      FAST2SMS_ENABLED: "true",
+      FAST2SMS_ROUTE: "q",
     },
   });
 
@@ -89,6 +93,10 @@ export default defineRailway(() => {
       MALWARE_SCANNER_BACKEND: "clamav",
       CLAMAV_HOST: "127.0.0.1",
       CLAMAV_PORT: "3310",
+      FAST2SMS_API_KEY: preserve(),
+      FAST2SMS_API_URL: "https://www.fast2sms.com/dev/bulkV2",
+      FAST2SMS_ENABLED: "true",
+      FAST2SMS_ROUTE: "q",
     },
   });
 

@@ -377,3 +377,15 @@ LOGGING = {
         },
     },
 }
+
+# -----------------------------------------------------------------------------
+# Fast2SMS SMS Notification & OTP Configuration (MoTA SIH 26239)
+# -----------------------------------------------------------------------------
+FAST2SMS_API_KEY = os.getenv('FAST2SMS_API_KEY', '')
+FAST2SMS_API_URL = os.getenv('FAST2SMS_API_URL', 'https://www.fast2sms.com/dev/bulkV2')
+FAST2SMS_ENABLED = os.getenv('FAST2SMS_ENABLED', 'true').lower() in ('true', '1', 't', 'yes')
+FAST2SMS_ROUTE = os.getenv('FAST2SMS_ROUTE', 'q')
+FAST2SMS_TIMEOUT_SECONDS = int(os.getenv('FAST2SMS_TIMEOUT_SECONDS', '10'))
+OTP_EXPIRY_MINUTES = int(os.getenv('OTP_EXPIRY_MINUTES', '5'))
+OTP_MAX_ATTEMPTS = int(os.getenv('OTP_MAX_ATTEMPTS', '5'))
+

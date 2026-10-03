@@ -35,6 +35,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (identifier: string, password: string) => Promise<{ destination: string; role: UserRole }>;
+  loginWithOTP: (mobile: string, otp: string) => Promise<{ destination: string; role: UserRole }>;
   register: (payload: {
     username: string;
     email: string;
@@ -120,6 +121,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithOTP = async (mobile: string, otp: string) => {
+
+    setError(null);
+    try {
+      const res = await authApi.verifyOTP(mobile, otp);
+      const authUser = res.user as AuthUser;
+      setUser(authUser);
+      const destination = getRoleDestination(authUser.role);
+      return { destination, role: authUser.role };
+    } catch (err: any) {
+      const msg = err.message || 'OTP verification failed. Please check the code and try again.';
+      setError(msg);
+      throw err;
+    }
+  };
+
   const register = async (payload: {
     username: string;
     email: string;
@@ -167,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         login,
+        loginWithOTP,
         register,
         logout,
         refreshSession,
@@ -175,6 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
+
 };
 
 export const useAuth = (): AuthContextType => {

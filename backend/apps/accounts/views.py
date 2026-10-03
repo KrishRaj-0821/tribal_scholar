@@ -116,3 +116,93 @@ class MeView(APIView):
             "user": UserSerializer(request.user).data,
             "token": request.session.session_key or ""
         }, status=status.HTTP_200_OK)
+
+
+class RequestOTPView(APIView):
+    """
+    POST /api/v1/auth/request-otp/
+    Dispatches a 6-digit cryptographic OTP via Fast2SMS to the requested Indian mobile number.
+    Rate-limited to 1 request per 60 seconds per phone number.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        mobile = request.data.get('mobile') or request.data.get('phone_number')
+        if not mobile:
+            return Response(
+                {"error": "Mobile phone number is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from apps.notifications.services import OTPService
+        success, msg, masked_phone = OTPService.generate_and_send_otp(str(mobile))
+        if not success:
+            is_rate_limit = "wait" in msg.lower() or "recently" in msg.lower()
+            return Response(
+                {"error": msg, "mobile_masked": masked_phone},
+                status=status.HTTP_429_TOO_MANY_REQUESTS if is_rate_limit else status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({
+            "message": msg,
+            "mobile_masked": masked_phone
+        }, status=status.HTTP_200_OK)
+
+
+class VerifyOTPView(APIView):
+    """
+    POST /api/v1/auth/verify-otp/
+    Validates the entered 6-digit OTP against the stored cryptographic hash.
+    Authenticates the applicant and returns a session token.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        mobile = request.data.get('mobile') or request.data.get('phone_number')
+        otp = request.data.get('otp')
+        if not mobile or not otp:
+            return Response(
+                {"error": "Both mobile number and OTP code are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import secrets
+        from apps.notifications.services import OTPService
+        from apps.notifications.providers.fast2sms import normalize_phone_number
+
+        try:
+            norm_phone = normalize_phone_number(str(mobile))
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_valid, msg, user = OTPService.verify_otp(norm_phone, str(otp))
+        if not is_valid:
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        # If user does not exist yet, provision an APPLICANT user with demographic profile
+        if not user:
+            from apps.applicants.models import ApplicantProfile, CommunityCategory
+            username = f"st_{norm_phone[-4:]}_{secrets.token_hex(3)}"
+            user = User.objects.create_user(
+                username=username,
+                email=f"{username}@tribal.nic.in",
+                role=UserRole.APPLICANT,
+                phone_number=norm_phone
+            )
+            ApplicantProfile.objects.create(
+                user=user,
+                community=CommunityCategory.ST
+            )
+
+        login(request, user)
+        if not request.session.session_key:
+            request.session.save()
+
+        return Response({
+            "message": "OTP verified successfully. Authenticated as applicant.",
+            "token": request.session.session_key,
+            "user": UserSerializer(user).data
+        }, status=status.HTTP_200_OK)
+
