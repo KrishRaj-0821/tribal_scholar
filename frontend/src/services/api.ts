@@ -309,6 +309,24 @@ export const applicationApi = {
 };
 
 // ----------------------------------------------------------------------
+// Schemes Master Service
+// ----------------------------------------------------------------------
+export const schemesApi = {
+  list: async (search?: string) => {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return await fetchApi<any>(`/api/v1/schemes/${query}`);
+  },
+
+  get: async (id: string) => {
+    return await fetchApi<any>(`/api/v1/schemes/${id}/`);
+  },
+
+  getForm: async (schemeVersionId: string) => {
+    return await fetchApi<any>(`/api/v1/schemes/${schemeVersionId}/application-form/`);
+  },
+};
+
+// ----------------------------------------------------------------------
 // Officer Verification Service
 // ----------------------------------------------------------------------
 export const officerApi = {

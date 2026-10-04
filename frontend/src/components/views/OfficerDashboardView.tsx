@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useDemo } from '../../context/DemoContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { TribalPattern } from '../common/TribalPattern';
+import { officerApi } from '../../services/api';
 import { 
   ArrowRight, ShieldCheck, Filter, Search, 
-  Landmark
+  Landmark, RefreshCw, CheckCircle2, RotateCcw
 } from 'lucide-react';
 
 interface OfficerDashboardViewProps {
@@ -19,10 +20,14 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
   const { applicant, verification } = useDemo();
   const [filterScheme, setFilterScheme] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [liveQueue, setLiveQueue] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
+  const [backendActive, setBackendActive] = useState<boolean>(false);
 
   const isVerified = verification.status === 'VERIFIED';
 
-  const scrutinyQueue = [
+  const defaultMockQueue = [
     {
       id: applicant.applicationId || 'APP-2026-001DB3',
       applicantName: applicant.name || 'Demo ST Applicant',
@@ -107,7 +112,61 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
     }
   ];
 
-  const filteredQueue = scrutinyQueue.filter(item => {
+  const fetchQueue = async () => {
+    setLoading(true);
+    try {
+      const res = await officerApi.getQueue();
+      const rawItems = Array.isArray(res) ? res : (res?.results || []);
+      if (rawItems && rawItems.length > 0) {
+        setBackendActive(true);
+        const mapped = rawItems.map((item: any) => ({
+          id: item.application_number || item.id,
+          applicantName: item.applicant_name || 'Applicant',
+          otrNo: item.target_identifier || 'OTR-2026-ST-LIVE',
+          scheme: item.scheme_name || 'Top Class Education for ST Students',
+          schemeCode: item.scheme_code || 'TOP-05',
+          institution: 'Synthetic Demo University (IIT Indore)',
+          submissionDate: item.assigned_at ? new Date(item.assigned_at).toLocaleDateString() : 'Live Scenario',
+          status: item.status === 'VERIFIED' ? ('VERIFIED' as const) : ('DEFICIENT' as const),
+          statusLabel: item.status === 'VERIFIED' ? 'Officer Verified' : (item.conflict_type ? `${item.conflict_type} (Pending Scrutiny)` : 'Pending Scrutiny'),
+          casteStatus: 'VERIFIED',
+          incomeStatus: item.conflict_type || (item.status === 'VERIFIED' ? 'VERIFIED' : 'MATERIAL_CONFLICT'),
+          bonafideStatus: 'VERIFIED',
+          actionUrgency: item.priority || 'HIGH',
+          isDemoTarget: true,
+          realAppId: item.application
+        }));
+        setLiveQueue(mapped);
+      } else {
+        setLiveQueue(defaultMockQueue);
+      }
+    } catch (err) {
+      console.warn('Queue fetch fallback to standard desk items:', err);
+      setLiveQueue(defaultMockQueue);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+  }, [verification.status]);
+
+  const handleResetScenario = async () => {
+    setIsResetting(true);
+    try {
+      await officerApi.resetDemo();
+      await fetchQueue();
+    } catch (e) {
+      console.error('Failed to reset demo scenario', e);
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const currentQueue = liveQueue.length > 0 ? liveQueue : defaultMockQueue;
+
+  const filteredQueue = currentQueue.filter(item => {
     if (filterScheme !== 'ALL' && item.schemeCode !== filterScheme) return false;
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
@@ -145,15 +204,35 @@ export const OfficerDashboardView: React.FC<OfficerDashboardViewProps> = ({
               </p>
             </div>
 
-            {/* DSC Token & Status */}
-            <div className="flex items-center gap-3">
+            {/* DSC Token, Sync & Reset Actions */}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={fetchQueue}
+                disabled={loading}
+                className="gov-btn bg-white/10 hover:bg-white/20 text-white font-bold text-xs py-2 px-3 flex items-center gap-1.5 rounded border border-white/20 transition-all"
+                title="Refresh Verification Queue"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>{loading ? 'Syncing...' : 'Refresh Queue'}</span>
+              </button>
+
+              <button
+                onClick={handleResetScenario}
+                disabled={isResetting}
+                className="gov-btn bg-[#FFC107] hover:bg-[#FFD54F] text-[#120538] font-bold text-xs py-2 px-3 flex items-center gap-1.5 rounded transition-all"
+                title="Reset or re-seed live verification scenario on backend database"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
+                <span>{isResetting ? 'Seeding Backend...' : 'Seed Live Case'}</span>
+              </button>
+
               <div className="bg-white/10 px-3 py-2 rounded border border-white/20 text-xs space-y-0.5">
                 <div className="flex items-center gap-1.5 text-[#81C784] font-bold">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>eMudhra DSC Token Active</span>
+                  {backendActive ? <CheckCircle2 className="w-4 h-4 text-[#81C784]" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>eMudhra DSC Active</span>
                 </div>
                 <div className="text-[11px] text-[#EBEAEA]/70 font-mono">
-                  Cert ID: DSC-MOTA-2026-JH-910
+                  {backendActive ? '✓ Backend DB Live' : 'Queue Synced'}
                 </div>
               </div>
             </div>

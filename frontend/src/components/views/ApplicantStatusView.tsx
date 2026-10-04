@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useDemo } from '../../context/DemoContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { notificationsApi, SMSNotificationRecord } from '../../services/api';
+import { notificationsApi, applicationApi, SMSNotificationRecord } from '../../services/api';
 import { 
   CheckCircle, Clock, ShieldCheck, 
   ArrowLeft, Info, MessageSquare, 
@@ -12,9 +12,12 @@ import {
 
 export const ApplicantStatusView: React.FC = () => {
   const { language } = useLanguage();
-  const { applicant, verification, setCurrentStep } = useDemo();
+  const navigate = useNavigate();
+  const { applicant, verification } = useDemo();
   const { id } = useParams<{ id: string }>();
 
+  const [realApp, setRealApp] = useState<any>(null);
+  const [loadingApp, setLoadingApp] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<SMSNotificationRecord[]>([]);
   const [loadingSMS, setLoadingSMS] = useState<boolean>(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -34,6 +37,11 @@ export const ApplicantStatusView: React.FC = () => {
   useEffect(() => {
     if (id) {
       fetchNotifications(id);
+      setLoadingApp(true);
+      applicationApi.get(id)
+        .then((data) => setRealApp(data))
+        .catch((err) => console.warn('Real application fetch fallback to dossier:', err))
+        .finally(() => setLoadingApp(false));
     }
   }, [id]);
 
@@ -51,8 +59,10 @@ export const ApplicantStatusView: React.FC = () => {
     }
   };
 
-  const isVerified = verification.status === 'VERIFIED';
-
+  const isVerified = verification.status === 'VERIFIED' || realApp?.current_state_code === 'VERIFIED';
+  const displayAppId = realApp?.application_number || realApp?.id || applicant.applicationId;
+  const displayScheme = realApp?.scheme_code ? `MoTA Scheme (${realApp.scheme_code})` : 'Top Class Education for ST Students (TOP-05)';
+  const displayState = realApp?.current_state_code || (isVerified ? 'VERIFIED' : 'UNDER_SCRUTINY');
 
   return (
     <div className="gov-container py-8 space-y-6">
@@ -60,13 +70,19 @@ export const ApplicantStatusView: React.FC = () => {
       <div className="gov-card flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-[#1D0A69]">
         <div>
           <div className="flex items-center gap-2 text-xs text-[#546E7A] mb-1">
-            <span className="font-mono text-[#1D0A69] font-bold">{applicant.applicationId}</span>
+            <span className="font-mono text-[#1D0A69] font-bold">{displayAppId}</span>
             <span>•</span>
             <span>OTR: <strong>{applicant.otrNo}</strong></span>
             <span>•</span>
             <span className="bg-[#E8F5E9] text-[#198754] px-2 py-0.5 rounded font-bold text-[10px]">
               {applicant.category}
             </span>
+            {loadingApp && (
+              <span className="flex items-center gap-1 text-[11px] text-[#0F4C81]">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Loading live...</span>
+              </span>
+            )}
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif text-[#1D0A69]">
             {language === 'hi' 
@@ -80,11 +96,11 @@ export const ApplicantStatusView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setCurrentStep('home')}
+            onClick={() => navigate('/dashboard')}
             className="gov-btn gov-btn-secondary text-xs flex items-center gap-1 font-bold"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Home</span>
+            <span>Return to Dashboard</span>
           </button>
         </div>
       </div>
@@ -97,7 +113,7 @@ export const ApplicantStatusView: React.FC = () => {
               Overall Application Status
             </span>
             <div className="text-lg font-bold text-[#1D0A69] flex items-center gap-2 mt-0.5">
-              <span>UNDER INSTITUTIONAL SCRUTINY</span>
+              <span>{displayState.replace(/_/g, ' ')}</span>
               <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${
                 isVerified ? 'bg-[#E8F5E9] text-[#1B5E20] border border-[#A5D6A7]' : 'bg-[#FFF3E0] text-[#E65100] border border-[#FFE0B2]'
               }`}>
@@ -108,7 +124,7 @@ export const ApplicantStatusView: React.FC = () => {
 
           <div className="text-right text-xs">
             <span className="text-[#546E7A] block">Target Scheme:</span>
-            <strong className="text-[#1D0A69]">Top Class Education for ST Students (TOP-05)</strong>
+            <strong className="text-[#1D0A69]">{displayScheme}</strong>
           </div>
         </div>
 

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { OFFICIAL_MOTA_SCHEMES, SchemeInfo } from '../../theme/tokens';
+import { schemesApi } from '../../services/api';
 import { TribalPattern, TribalPatternVariant } from '../common/TribalPattern';
 import { 
   Filter, Search, FileText, ArrowRight, 
-  Calendar, ChevronRight 
+  Calendar, ChevronRight, RefreshCw, CheckCircle2
 } from 'lucide-react';
 
 interface SchemeExplorerViewProps {
@@ -20,6 +21,27 @@ export const SchemeExplorerView: React.FC<SchemeExplorerViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [incomeFilter, setIncomeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [backendSynced, setBackendSynced] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveSchemes = async () => {
+      setLoading(true);
+      try {
+        const res = await schemesApi.list();
+        if (isMounted && res) {
+          setBackendSynced(true);
+        }
+      } catch (e) {
+        console.warn('Backend schemes synchronization fallback:', e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchLiveSchemes();
+    return () => { isMounted = false; };
+  }, []);
 
   const getSchemePattern = (code: string): TribalPatternVariant => {
     switch (code) {
@@ -190,10 +212,23 @@ export const SchemeExplorerView: React.FC<SchemeExplorerViewProps> = ({
         {/* Right Scheme Directory (8 Cols) */}
         <main className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between text-xs text-[#546E7A] bg-white p-2.5 rounded border border-[#CFD8DC]">
-            <div>
-              {language === 'hi' 
-                ? `कुल ${filteredSchemes.length} योजनाएं उपलब्ध` 
-                : `Showing ${filteredSchemes.length} Statutory MoTA Schemes`}
+            <div className="flex items-center gap-2">
+              <span>
+                {language === 'hi' 
+                  ? `कुल ${filteredSchemes.length} योजनाएं उपलब्ध` 
+                  : `Showing ${filteredSchemes.length} Statutory MoTA Schemes`}
+              </span>
+              {loading ? (
+                <span className="flex items-center gap-1 text-[11px] text-[#0F4C81]">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <span>Syncing...</span>
+                </span>
+              ) : backendSynced ? (
+                <span className="flex items-center gap-1 text-[10px] text-[#198754] font-semibold bg-[#E8F5E9] px-2 py-0.5 rounded">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Backend Live</span>
+                </span>
+              ) : null}
             </div>
             <div className="font-semibold text-[#1D0A69]">
               Academic Year: 2026-2027

@@ -8,6 +8,7 @@ import { AccessibilityToolbar } from './components/common/AccessibilityToolbar';
 import { GovernmentHeader } from './components/common/GovernmentHeader';
 import { GovernmentFooter } from './components/common/GovernmentFooter';
 import { PortalNavigationBar } from './components/common/PortalNavigationBar';
+import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { PwaOfflineBanner } from './components/common/PwaOfflineBanner';
 
@@ -153,7 +154,7 @@ const AppLayout: React.FC = () => {
       <PortalNavigationBar />
 
       {/* 4. Sovereign Main Routed View Content */}
-      <main id="main-content" className="flex-1" role="main">
+      <main id="main-content" className="flex-1 pb-16 md:pb-0" role="main">
         <Routes>
           {/* ========================================================
               PUBLIC ROUTES (Requirement 3: Never require auth)
@@ -371,6 +372,9 @@ const AppLayout: React.FC = () => {
 
       {/* 5. GIGW 3.0 Statutory Footer */}
       <GovernmentFooter />
+
+      {/* 6. Mobile Role-Aware Sticky Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   );
 };
