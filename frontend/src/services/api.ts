@@ -306,6 +306,16 @@ export const applicationApi = {
   getSnapshot: async (applicationId: string) => {
     return await fetchApi<any>(`/api/v1/applications/${applicationId}/submission-snapshot/`);
   },
+
+  uploadDocument: async (applicationId: string, file: File, documentType: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', documentType);
+    return await fetchApi<any>(`/api/v1/applications/${applicationId}/documents/?sync=true`, {
+      method: 'POST',
+      body: formData,
+    });
+  },
 };
 
 // ----------------------------------------------------------------------

@@ -8,7 +8,7 @@ import {
   CheckCircle2, ArrowRight, ArrowLeft, 
   FileText, ShieldCheck, AlertCircle, 
   User, BookOpen, Save, Sparkles, FolderLock, 
-  RefreshCw, Check
+  RefreshCw, Check, UploadCloud
 } from 'lucide-react';
 
 interface ApplicationWizardViewProps {
@@ -16,6 +16,16 @@ interface ApplicationWizardViewProps {
   onSubmitted?: () => void;
   onCancel?: () => void;
 }
+
+export const PREMIER_INSTITUTIONS = [
+  { code: 'IIT-BOM', name: 'Indian Institute of Technology Bombay' },
+  { code: 'IIT-DEL', name: 'Indian Institute of Technology Delhi' },
+  { code: 'IIT-MAD', name: 'Indian Institute of Technology Madras' },
+  { code: 'IIM-AHM', name: 'Indian Institute of Management Ahmedabad' },
+  { code: 'AIIMS-DEL', name: 'All India Institute of Medical Sciences New Delhi' },
+  { code: 'NIT-TRICHY', name: 'National Institute of Technology Tiruchirappalli' },
+  { code: 'NLSIU-BLR', name: 'National Law School of India University Bengaluru' },
+];
 
 export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   initialScheme,
@@ -49,12 +59,17 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   const [districtName, setDistrictName] = useState('Ranchi');
   const [community, setCommunity] = useState('ST');
   const [casteCertNo, setCasteCertNo] = useState('');
-  const [institutionName, setInstitutionName] = useState('IIT Kharagpur');
-  const [aisheCode, setAisheCode] = useState('U-0570');
+  const [institutionName, setInstitutionName] = useState('Indian Institute of Technology Bombay');
+  const [aisheCode, setAisheCode] = useState('IIT-BOM');
   const [courseName, setCourseName] = useState('B.Tech Computer Science');
   const [admissionYear, setAdmissionYear] = useState('2026');
   const [annualIncome, setAnnualIncome] = useState<string>('500000');
   const [incomeCertNo, setIncomeCertNo] = useState('');
+
+  // Document Upload in Wizard
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadDocType, setUploadDocType] = useState('INCOME_CERTIFICATE');
+  const [attachedDocTypes, setAttachedDocTypes] = useState<string[]>([]);
 
   // Income reuse decision
   const [incomeReusePromptDismissed, setIncomeReusePromptDismissed] = useState<boolean>(false);
@@ -143,15 +158,47 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
     setErrorMessage(null);
     try {
       await applicationApi.saveForm(applicationId, {
-        annual_family_income: annualIncome,
+        annual_family_income: Number(annualIncome),
         caste_certificate_number: casteCertNo,
         institution_name: institutionName,
         course_name: courseName,
+        institute_code: aisheCode || 'IIT-BOM',
       });
       setSaveSuccessMsg("✓ Application progress securely saved to MoTA sovereign database.");
       setTimeout(() => setSaveSuccessMsg(null), 3000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to save draft.');
+    }
+  };
+
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !applicationId) return;
+    setUploadingDoc(true);
+    setErrorMessage(null);
+    try {
+      await applicationApi.uploadDocument(applicationId, file, uploadDocType);
+      setAttachedDocTypes(prev => Array.from(new Set([...prev, uploadDocType])));
+      setSaveSuccessMsg(`✓ ${uploadDocType.replace('_', ' ')} uploaded, scanned, and attached to this dossier.`);
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+      const vaultRes = await vaultApi.getDocuments();
+      setVaultDocuments(vaultRes?.documents || []);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to upload document.');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleLinkVaultDoc = async (doc: VaultDocument) => {
+    if (!applicationId) return;
+    try {
+      await vaultApi.linkDocument(doc.id, applicationId);
+      setAttachedDocTypes(prev => Array.from(new Set([...prev, doc.document_type])));
+      setSaveSuccessMsg(`✓ Linked ${doc.display_type} to this application.`);
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to link document.');
     }
   };
 
@@ -161,13 +208,14 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
     setErrorMessage(null);
 
     try {
-      // 1. Save all fields to authoritative backend form
+      // 1. Save all fields to authoritative backend form with institute_code
       await applicationApi.saveForm(applicationId, {
-        annual_family_income: annualIncome,
+        annual_family_income: Number(annualIncome),
         caste_certificate_number: casteCertNo,
         community,
         institution_name: institutionName,
         course_name: courseName,
+        institute_code: aisheCode || 'IIT-BOM',
       });
 
       // 2. Submit with Idempotency Key
@@ -619,17 +667,17 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
               )}
 
               {/* ─────────────────────────────────────────────────────────────
-                  STEP 4: DOCUMENT VAULT LINKING
+                  STEP 4: DOCUMENT ATTACHMENT & VAULT LINKING
                   ───────────────────────────────────────────────────────────── */}
               {currentStep === 4 && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-base font-bold text-[#1D0A69]">
-                        4. Link Documents from My Document Vault
+                        4. Attach Mandatory Documents to Dossier
                       </h3>
                       <p className="text-xs text-[#546E7A]">
-                        Reuse your previously verified certificates without re-uploading.
+                        Upload certificates directly or link from your sovereign document vault.
                       </p>
                     </div>
 
@@ -643,21 +691,103 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     </Link>
                   </div>
 
-                  <div className="space-y-3">
-                    {vaultDocuments.length === 0 ? (
-                      <div className="p-6 bg-[#F8F9FA] rounded-xl border border-dashed border-[#CFD8DC] text-center">
-                        <FolderLock className="w-8 h-8 text-[#78909C] mx-auto mb-2" />
-                        <p className="text-xs font-bold text-[#1D0A69]">No documents in your vault yet</p>
-                        <p className="text-[11px] text-[#546E7A] mt-1">
-                          You can upload your certificates directly to your vault so they are automatically reused for all future schemes.
+                  {/* Attached Status Checklist */}
+                  <div className="bg-[#F8F9FA] border border-[#CFD8DC] rounded-xl p-4">
+                    <div className="text-xs font-bold text-[#1D0A69] mb-2 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#1D0A69]" />
+                      <span>Dossier Attachment Status</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className={`p-2.5 rounded-lg border flex items-center justify-between ${
+                        attachedDocTypes.includes('INCOME_CERTIFICATE')
+                          ? 'bg-[#E8F5E9] border-[#A5D6A7] text-[#1B5E20]'
+                          : 'bg-[#FFF8E1] border-[#FFE082] text-[#7A5E00]'
+                      }`}>
+                        <span className="font-semibold">Income Certificate (Mandatory)</span>
+                        <span className="font-bold text-[11px]">
+                          {attachedDocTypes.includes('INCOME_CERTIFICATE') ? '✓ Attached' : '⚠️ Missing'}
+                        </span>
+                      </div>
+
+                      <div className={`p-2.5 rounded-lg border flex items-center justify-between ${
+                        attachedDocTypes.includes('CASTE_CERTIFICATE')
+                          ? 'bg-[#E8F5E9] border-[#A5D6A7] text-[#1B5E20]'
+                          : 'bg-[#FAFAFA] border-[#CFD8DC] text-[#546E7A]'
+                      }`}>
+                        <span className="font-semibold">Caste Certificate (ST)</span>
+                        <span className="font-bold text-[11px]">
+                          {attachedDocTypes.includes('CASTE_CERTIFICATE') ? '✓ Attached' : 'Optional at Draft'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Direct Document Upload Card */}
+                  <div className="bg-white border-2 border-dashed border-[#1D0A69]/30 hover:border-[#1D0A69] rounded-xl p-5 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8EAF6] text-[#1D0A69] flex items-center justify-center flex-shrink-0">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-[#1D0A69]">
+                          Upload Document Directly to this Application
+                        </h4>
+                        <p className="text-xs text-[#546E7A] mt-0.5">
+                          Files are automatically scanned with ClamAV antivirus and processed for OCR.
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => navigate('/documents')}
-                          className="mt-3 bg-[#1D0A69] text-white px-4 py-1.5 rounded text-xs font-bold"
-                        >
-                          Upload to Vault
-                        </button>
+
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#1D0A69] mb-1">
+                              Document Type
+                            </label>
+                            <select
+                              value={uploadDocType}
+                              onChange={(e) => setUploadDocType(e.target.value)}
+                              className="w-full text-xs p-2 border border-[#CFD8DC] rounded bg-white"
+                              disabled={uploadingDoc}
+                            >
+                              <option value="INCOME_CERTIFICATE">Income Certificate (Required)</option>
+                              <option value="CASTE_CERTIFICATE">Caste Certificate (ST)</option>
+                              <option value="ADMISSION_LETTER">Admission Letter / Fee Slip</option>
+                              <option value="AADHAAR_CARD">Aadhaar Card / ID Proof</option>
+                            </select>
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-bold text-[#1D0A69] mb-1">
+                              Choose File (PDF, PNG, JPG - Max 10MB)
+                            </label>
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              onChange={handleDirectUpload}
+                              disabled={uploadingDoc || !applicationId}
+                              className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#1D0A69] file:text-white hover:file:bg-[#15074D] cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        {uploadingDoc && (
+                          <div className="mt-3 flex items-center gap-2 text-xs text-[#1D0A69] font-bold">
+                            <RefreshCw className="w-4 h-4 animate-spin text-[#1D0A69]" />
+                            <span>Uploading, scanning with ClamAV, and linking to dossier...</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vault Documents List */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#546E7A]">
+                      Or Link From Previously Uploaded Vault Documents
+                    </h4>
+
+                    {vaultDocuments.length === 0 ? (
+                      <div className="p-4 bg-[#F8F9FA] rounded-lg border border-[#CFD8DC] text-center text-xs text-[#546E7A]">
+                        No documents stored in vault yet. Use the upload box above to attach your certificates.
                       </div>
                     ) : (
                       vaultDocuments.map((doc) => (
@@ -684,16 +814,14 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                             </span>
                             <button
                               type="button"
-                              onClick={async () => {
-                                if (applicationId) {
-                                  await vaultApi.linkDocument(doc.id, applicationId);
-                                  setSaveSuccessMsg(`Linked ${doc.display_type} to this application.`);
-                                  setTimeout(() => setSaveSuccessMsg(null), 2500);
-                                }
-                              }}
-                              className="bg-white border border-[#CFD8DC] hover:border-[#1D0A69] text-[#1D0A69] font-bold px-2.5 py-1 rounded text-[11px]"
+                              onClick={() => handleLinkVaultDoc(doc)}
+                              className={`border font-bold px-2.5 py-1 rounded text-[11px] ${
+                                attachedDocTypes.includes(doc.document_type)
+                                  ? 'bg-[#E8F5E9] border-[#A5D6A7] text-[#1B5E20]'
+                                  : 'bg-white border-[#CFD8DC] hover:border-[#1D0A69] text-[#1D0A69]'
+                              }`}
                             >
-                              Link to Dossier
+                              {attachedDocTypes.includes(doc.document_type) ? '✓ Attached' : 'Link to Dossier'}
                             </button>
                           </div>
                         </div>

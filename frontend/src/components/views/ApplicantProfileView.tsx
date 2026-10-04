@@ -64,18 +64,16 @@ export const ApplicantProfileView: React.FC = () => {
 
     try {
       const updated = await profileApi.updateProfile({
-        user: {
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          phone_number: phone,
-        },
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim(),
+        phone_number: phone.trim(),
         gender,
         date_of_birth: dob || null,
         community,
-        caste_certificate_number: casteCertNo,
-        annual_family_income: income,
-        income_certificate_number: incomeCertNo,
+        caste_certificate_number: casteCertNo.trim(),
+        annual_family_income: Number(income),
+        income_certificate_number: incomeCertNo.trim(),
       });
 
       setCompletionPct(updated.completion_percentage || 100);

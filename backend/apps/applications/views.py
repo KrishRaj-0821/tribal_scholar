@@ -54,9 +54,17 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         if 'scheme_version' not in data or not data['scheme_version']:
             scheme_code = data.get('scheme_code') or data.get('scheme')
             if scheme_code:
-                sv = SchemeVersion.objects.filter(scheme__code__iexact=str(scheme_code).replace('-', '_')).order_by('-version_number').first()
+                code_str = str(scheme_code).strip().upper()
+                clean_code = code_str.replace('-', '_')
+                prefix = clean_code.split('_')[0]
+
+                sv = SchemeVersion.objects.filter(scheme__code__iexact=code_str).order_by('-version_number').first()
                 if not sv:
-                    sv = SchemeVersion.objects.filter(scheme__code__icontains=str(scheme_code)).first()
+                    sv = SchemeVersion.objects.filter(scheme__code__iexact=clean_code).order_by('-version_number').first()
+                if not sv:
+                    sv = SchemeVersion.objects.filter(scheme__code__istartswith=prefix).order_by('-version_number').first()
+                if not sv:
+                    sv = SchemeVersion.objects.filter(scheme__code__icontains=prefix).order_by('-version_number').first()
                 if sv:
                     data['scheme_version'] = str(sv.id)
             if 'scheme_version' not in data or not data['scheme_version']:

@@ -16,26 +16,38 @@ export const RegistrationView: React.FC = () => {
   const [phase, setPhase] = useState<'REGISTER' | 'COMPLETE_PROFILE'>('REGISTER');
 
   // Registration Form
-  const [username, setUsername] = useState('rajesh_soren');
-  const [email, setEmail] = useState('rajesh.soren@tribal.gov.in');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('Tribal@2026');
-  const [phone, setPhone] = useState('9876543210');
+  const [phone, setPhone] = useState('');
   const [community, setCommunity] = useState('ST');
   const [income, setIncome] = useState<number>(350000);
 
   // Profile Onboarding Form
-  const [firstName, setFirstName] = useState('Rajeshwar');
-  const [lastName, setLastName] = useState('Soren');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState('MALE');
   const [dob, setDob] = useState('2003-08-14');
-  const [casteCertNo, setCasteCertNo] = useState('JH/ST/2024/77491');
+  const [casteCertNo, setCasteCertNo] = useState('');
   const [stateDomicile, setStateDomicile] = useState('JHARKHAND');
   const [district, setDistrict] = useState('Ranchi');
-  const [institution, setInstitution] = useState('IIT Kharagpur');
+  const [institution, setInstitution] = useState('IIT Bombay');
   const [course, setCourse] = useState('B.Tech Computer Science');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Helper to fill unique synthetic candidate
+  const fillSyntheticCandidate = () => {
+    const suffix = Date.now().toString().slice(-5);
+    setUsername(`student_st_${suffix}`);
+    setEmail(`student_${suffix}@tribal.gov.in`);
+    setPhone(`98765${suffix}`);
+    setPassword('Tribal@2026');
+    setFirstName('Birsa');
+    setLastName(`Munda${suffix.slice(-2)}`);
+    setCasteCertNo(`JH/ST/2026/${suffix}`);
+  };
 
   // Compute profile completion percentage
   const calculateCompletion = () => {
@@ -78,15 +90,13 @@ export const RegistrationView: React.FC = () => {
 
     try {
       await profileApi.updateProfile({
-        user: {
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: phone,
-        },
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        phone_number: phone.trim(),
         gender,
-        date_of_birth: dob,
-        caste_certificate_number: casteCertNo,
-        annual_family_income: income,
+        date_of_birth: dob || null,
+        caste_certificate_number: casteCertNo.trim(),
+        annual_family_income: Number(income),
       });
 
       navigate('/dashboard', { replace: true });
@@ -152,16 +162,28 @@ export const RegistrationView: React.FC = () => {
         
         {phase === 'REGISTER' ? (
           <div className="max-w-xl mx-auto bg-white rounded-xl shadow-md border border-[#CFD8DC] p-6 sm:p-8">
-            <div className="mb-6">
-              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-[#E8EAF6] text-[#1D0A69]">
-                Step 1 of 2: Create Sovereign ST Identity
-              </span>
-              <h2 className="text-lg font-bold text-[#1D0A69] mt-1">
-                Candidate Account Registration
-              </h2>
-              <p className="text-xs text-[#546E7A] mt-0.5">
-                Public registration creates an official APPLICANT account. Officers and authorities are provisioned via administrative channels.
-              </p>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-[#E8EAF6] text-[#1D0A69]">
+                  Step 1 of 2: Create Sovereign ST Identity
+                </span>
+                <h2 className="text-lg font-bold text-[#1D0A69] mt-1">
+                  Candidate Account Registration
+                </h2>
+                <p className="text-xs text-[#546E7A] mt-0.5">
+                  Public registration creates an official APPLICANT account.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fillSyntheticCandidate}
+                className="gov-btn bg-[#FFF8E1] hover:bg-[#FFECB3] text-[#7A5E00] border border-[#FFE082] text-xs py-1.5 px-3 rounded font-bold flex items-center gap-1.5"
+                title="Fill unique synthetic applicant for test & audit"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#F57F17]" />
+                <span>Auto-Fill Test Applicant</span>
+              </button>
             </div>
 
             {errorMsg && (
@@ -180,6 +202,7 @@ export const RegistrationView: React.FC = () => {
                   <input
                     type="text"
                     required
+                    placeholder="e.g. birsa_munda"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded-lg bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-[#1D0A69]"
@@ -193,6 +216,7 @@ export const RegistrationView: React.FC = () => {
                   <input
                     type="email"
                     required
+                    placeholder="e.g. birsa@tribal.gov.in"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded-lg bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-[#1D0A69]"

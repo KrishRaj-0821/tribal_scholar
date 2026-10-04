@@ -38,6 +38,15 @@ class ApplicantProfileSerializer(serializers.ModelSerializer):
         total = len(fields_to_check)
         return int((completed / total) * 100)
 
+    def to_internal_value(self, data):
+        data_copy = data.copy() if hasattr(data, 'copy') else dict(data)
+        nested_user = data_copy.pop('user', None)
+        if isinstance(nested_user, dict):
+            for k, v in nested_user.items():
+                if k not in data_copy and v is not None:
+                    data_copy[k] = v
+        return super().to_internal_value(data_copy)
+
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
         user = instance.user
