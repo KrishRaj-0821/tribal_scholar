@@ -75,3 +75,32 @@ def dispatch_sms_notification_task(self, notification_id: str, phone_number: str
             notification_id,
             notification.failure_reason
         )
+
+
+@shared_task(bind=True)
+def check_worker_egress_ip_task(self):
+    """
+    Diagnostic Celery task executed directly on the Celery worker container.
+    Queries both https://api.ipify.org and https://ifconfig.me to inspect
+    the worker's active outbound egress IPv4 address.
+    """
+    import urllib.request
+    import socket
+    results = {
+        "worker_hostname": socket.gethostname(),
+        "task_name": "apps.notifications.tasks.check_worker_egress_ip_task",
+        "worker_id": getattr(self.request, 'hostname', None) or socket.gethostname()
+    }
+    for url, key in [('https://api.ipify.org', 'api_ipify'), ('https://ifconfig.me', 'ifconfig_me')]:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'curl/8.0.0'})
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                results[key] = resp.read().decode('utf-8').strip()
+        except Exception as e:
+            results[key] = f"error: {str(e)}"
+    results["ips_match"] = (
+        results.get("api_ipify") == results.get("ifconfig_me") and
+        "error" not in results.get("api_ipify", "")
+    )
+    return results
+
