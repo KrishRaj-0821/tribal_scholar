@@ -88,6 +88,7 @@ const SchemeDetailPage: React.FC = () => {
 // Application Wizard Wrapper
 const ApplicationWizardPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const schemeCode = searchParams.get('scheme');
 
@@ -97,6 +98,7 @@ const ApplicationWizardPage: React.FC = () => {
 
   return (
     <ApplicationWizardView
+      existingApplicationId={id}
       initialScheme={initialScheme}
       onSubmitted={() => navigate('/dashboard')}
       onCancel={() => navigate('/schemes')}

@@ -13,6 +13,7 @@ import {
 
 interface ApplicationWizardViewProps {
   initialScheme?: SchemeInfo | null;
+  existingApplicationId?: string;
   onSubmitted?: () => void;
   onCancel?: () => void;
 }
@@ -29,6 +30,7 @@ export const PREMIER_INSTITUTIONS = [
 
 export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   initialScheme,
+  existingApplicationId,
   onSubmitted,
   onCancel
 }) => {
@@ -36,16 +38,28 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   const navigate = useNavigate();
 
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [selectedScheme] = useState<SchemeInfo>(initialScheme || OFFICIAL_MOTA_SCHEMES[2]); // Top Class
+  const [selectedScheme, setSelectedScheme] = useState<SchemeInfo>(initialScheme || OFFICIAL_MOTA_SCHEMES[2]); // Top Class
   
   // Real Backend Application Record
-  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(existingApplicationId || null);
   const [applicationNumber, setApplicationNumber] = useState<string>('CREATING...');
   const [creatingApp, setCreatingApp] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Authoritative Readiness State
+  const [readinessData, setReadinessData] = useState<{
+    is_ready: boolean;
+    status: 'READY' | 'NOT_READY';
+    missing_fields: string[];
+    missing_documents: string[];
+    field_errors: Record<string, string[]>;
+    errors: any[];
+    message: string;
+  } | null>(null);
+  const [checkingReadiness, setCheckingReadiness] = useState<boolean>(false);
 
   // Reusable information from Vault & Profile
   const [reusableFields, setReusableFields] = useState<Record<string, any>>({});
@@ -65,6 +79,10 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   const [admissionYear, setAdmissionYear] = useState('2026');
   const [annualIncome, setAnnualIncome] = useState<string>('500000');
   const [incomeCertNo, setIncomeCertNo] = useState('');
+  const [studyDestination, setStudyDestination] = useState<string>('ABROAD');
+  const [foreignUniversity, setForeignUniversity] = useState<string>('University of Oxford');
+
+  const isOverseasScheme = selectedScheme.code.toUpperCase().includes('NOS') || selectedScheme.code.toUpperCase().includes('OVERSEAS');
 
   // Document Upload in Wizard
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -102,22 +120,51 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
         }
 
         if (vaultRes.status === 'fulfilled' && isMounted) {
-          setVaultDocuments(vaultRes.value?.documents || []);
+          const docs = vaultRes.value?.documents || [];
+          setVaultDocuments(docs);
+          setAttachedDocTypes(docs.map((d: any) => d.document_type));
         }
 
-        // 2. Create actual backend Application record
-        const appRes = await applicationApi.create({
-          scheme_code: selectedScheme.code,
-        });
+        // 2. Load existing or create new backend Application record
+        if (existingApplicationId) {
+          const [appRes, formRes] = await Promise.all([
+            applicationApi.get(existingApplicationId),
+            applicationApi.getForm(existingApplicationId),
+          ]);
 
-        if (isMounted) {
-          setApplicationId(appRes.id);
-          setApplicationNumber(appRes.application_number);
+          if (isMounted) {
+            setApplicationId(appRes.id);
+            setApplicationNumber(appRes.application_number);
+
+            const schCode = appRes.scheme_version?.scheme?.code || appRes.scheme_code;
+            if (schCode) {
+              const matched = OFFICIAL_MOTA_SCHEMES.find(s => s.code.toLowerCase() === schCode.toLowerCase());
+              if (matched) setSelectedScheme(matched);
+            }
+
+            const ev = formRes?.effective_values || {};
+            if (ev['study_destination']) setStudyDestination(String(ev['study_destination'].value));
+            if (ev['foreign_university']) setForeignUniversity(String(ev['foreign_university'].value));
+            if (ev['annual_family_income']) setAnnualIncome(String(ev['annual_family_income'].value));
+            if (ev['caste_certificate_number']) setCasteCertNo(String(ev['caste_certificate_number'].value));
+            if (ev['institution_name']) setInstitutionName(String(ev['institution_name'].value));
+            if (ev['course_name']) setCourseName(String(ev['course_name'].value));
+            if (ev['institute_code']) setAisheCode(String(ev['institute_code'].value));
+          }
+        } else {
+          const appRes = await applicationApi.create({
+            scheme_code: selectedScheme.code,
+          });
+
+          if (isMounted) {
+            setApplicationId(appRes.id);
+            setApplicationNumber(appRes.application_number);
+          }
         }
       } catch (err: any) {
         console.error('Failed to initialize application', err);
         if (isMounted) {
-          setErrorMessage(err.message || 'Failed to create application on sovereign server.');
+          setErrorMessage(err.message || 'Failed to initialize application on sovereign server.');
         }
       } finally {
         if (isMounted) setCreatingApp(false);
@@ -126,7 +173,7 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
 
     initializeDossier();
     return () => { isMounted = false; };
-  }, [selectedScheme]);
+  }, [selectedScheme, existingApplicationId]);
 
   // Handler to apply reusable information from Vault (Requirement 14, 16, 28)
   const applyIncomeFromVault = () => {
@@ -153,17 +200,56 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
     setCasteReusePromptDismissed(true);
   };
 
+  const refreshReadiness = async (appId?: string) => {
+    const id = appId || applicationId;
+    if (!id) return;
+    setCheckingReadiness(true);
+    try {
+      const answers: Record<string, any> = {
+        annual_family_income: Number(annualIncome),
+        caste_certificate_number: casteCertNo,
+        community,
+        institution_name: institutionName,
+        course_name: courseName,
+        institute_code: aisheCode || 'IIT-BOM',
+      };
+      if (isOverseasScheme) {
+        answers.study_destination = studyDestination;
+        answers.foreign_university = foreignUniversity;
+      }
+      await applicationApi.saveForm(id, answers);
+      const res = await applicationApi.getReadiness(id);
+      setReadinessData(res);
+    } catch (err: any) {
+      console.warn('Readiness check error:', err);
+    } finally {
+      setCheckingReadiness(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentStep === 5 && applicationId) {
+      refreshReadiness(applicationId);
+    }
+  }, [currentStep, applicationId]);
+
   const handleSaveDraft = async () => {
     if (!applicationId) return;
     setErrorMessage(null);
     try {
-      await applicationApi.saveForm(applicationId, {
+      const answers: Record<string, any> = {
         annual_family_income: Number(annualIncome),
         caste_certificate_number: casteCertNo,
+        community,
         institution_name: institutionName,
         course_name: courseName,
         institute_code: aisheCode || 'IIT-BOM',
-      });
+      };
+      if (isOverseasScheme) {
+        answers.study_destination = studyDestination;
+        answers.foreign_university = foreignUniversity;
+      }
+      await applicationApi.saveForm(applicationId, answers);
       setSaveSuccessMsg("✓ Application progress securely saved to MoTA sovereign database.");
       setTimeout(() => setSaveSuccessMsg(null), 3000);
     } catch (err: any) {
@@ -183,6 +269,9 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
       setTimeout(() => setSaveSuccessMsg(null), 4000);
       const vaultRes = await vaultApi.getDocuments();
       setVaultDocuments(vaultRes?.documents || []);
+      if (currentStep === 5) {
+        refreshReadiness(applicationId);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to upload document.');
     } finally {
@@ -197,6 +286,9 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
       setAttachedDocTypes(prev => Array.from(new Set([...prev, doc.document_type])));
       setSaveSuccessMsg(`✓ Linked ${doc.display_type} to this application.`);
       setTimeout(() => setSaveSuccessMsg(null), 3000);
+      if (currentStep === 5) {
+        refreshReadiness(applicationId);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to link document.');
     }
@@ -208,15 +300,20 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
     setErrorMessage(null);
 
     try {
-      // 1. Save all fields to authoritative backend form with institute_code
-      await applicationApi.saveForm(applicationId, {
+      // 1. Save all fields to authoritative backend form
+      const answers: Record<string, any> = {
         annual_family_income: Number(annualIncome),
         caste_certificate_number: casteCertNo,
         community,
         institution_name: institutionName,
         course_name: courseName,
         institute_code: aisheCode || 'IIT-BOM',
-      });
+      };
+      if (isOverseasScheme) {
+        answers.study_destination = studyDestination;
+        answers.foreign_university = foreignUniversity;
+      }
+      await applicationApi.saveForm(applicationId, answers);
 
       // 2. Submit with Idempotency Key
       const idempotencyKey = `submit_${applicationId}_${Date.now()}`;
@@ -232,6 +329,7 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Submission failed. Please check required fields.');
+      refreshReadiness(applicationId);
     } finally {
       setSubmitting(false);
     }
@@ -508,56 +606,117 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">
-                        Notified Institution / University (AISHE List)
-                      </label>
-                      <input
-                        type="text"
-                        value={institutionName}
-                        onChange={(e) => setInstitutionName(e.target.value)}
-                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">
-                        AISHE Code
-                      </label>
-                      <input
-                        type="text"
-                        value={aisheCode}
-                        onChange={(e) => setAisheCode(e.target.value)}
-                        placeholder="e.g. U-0570"
-                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white font-mono"
-                      />
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-[#2E7D32] font-semibold -mt-2 block">
-                    ✓ AISHE Verified Institution: Top Class Education Eligible
-                  </span>
+                  {isOverseasScheme ? (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                            Study Destination *
+                          </label>
+                          <select
+                            value={studyDestination}
+                            onChange={(e) => setStudyDestination(e.target.value)}
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white font-semibold"
+                          >
+                            <option value="ABROAD">Abroad (QS Top 500 Foreign Universities)</option>
+                            <option value="DOMESTIC">Domestic Institution</option>
+                          </select>
+                          <span className="text-[10px] text-[#2E7D32] font-semibold mt-1 block">
+                            ✓ Eligible for National Overseas Scholarship statutory funding
+                          </span>
+                        </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Course of Study</label>
-                      <input
-                        type="text"
-                        value={courseName}
-                        onChange={(e) => setCourseName(e.target.value)}
-                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                            Foreign University / Institution (QS Top 500)
+                          </label>
+                          <input
+                            type="text"
+                            value={foreignUniversity}
+                            onChange={(e) => setForeignUniversity(e.target.value)}
+                            placeholder="e.g. University of Oxford, Cambridge, MIT"
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white font-semibold"
+                          />
+                        </div>
+                      </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-[#1D0A69] mb-1">Admission Cycle</label>
-                      <input
-                        type="text"
-                        value={admissionYear}
-                        onChange={(e) => setAdmissionYear(e.target.value)}
-                        className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
-                      />
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">Course / Degree Level</label>
+                          <input
+                            type="text"
+                            value={courseName}
+                            onChange={(e) => setCourseName(e.target.value)}
+                            placeholder="e.g. M.Sc / Ph.D Computer Science"
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">Academic Intake Year</label>
+                          <input
+                            type="text"
+                            value={admissionYear}
+                            onChange={(e) => setAdmissionYear(e.target.value)}
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                            Notified Institution / University (AISHE List)
+                          </label>
+                          <input
+                            type="text"
+                            value={institutionName}
+                            onChange={(e) => setInstitutionName(e.target.value)}
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">
+                            AISHE Code
+                          </label>
+                          <input
+                            type="text"
+                            value={aisheCode}
+                            onChange={(e) => setAisheCode(e.target.value)}
+                            placeholder="e.g. U-0570"
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white font-mono"
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-[#2E7D32] font-semibold -mt-2 block">
+                        ✓ AISHE Verified Institution: Top Class Education Eligible
+                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">Course of Study</label>
+                          <input
+                            type="text"
+                            value={courseName}
+                            onChange={(e) => setCourseName(e.target.value)}
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#1D0A69] mb-1">Admission Cycle</label>
+                          <input
+                            type="text"
+                            value={admissionYear}
+                            onChange={(e) => setAdmissionYear(e.target.value)}
+                            className="w-full text-xs p-2.5 border border-[#CFD8DC] rounded bg-white"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -750,6 +909,7 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                             >
                               <option value="INCOME_CERTIFICATE">Income Certificate (Required)</option>
                               <option value="CASTE_CERTIFICATE">Caste Certificate (ST)</option>
+                              <option value="ADMISSION_OFFER">Admission Offer Letter (Foreign / Premier Inst)</option>
                               <option value="ADMISSION_LETTER">Admission Letter / Fee Slip</option>
                               <option value="AADHAAR_CARD">Aadhaar Card / ID Proof</option>
                             </select>
@@ -848,9 +1008,19 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                   <div className="border border-[#CFD8DC] rounded-xl overflow-hidden divide-y divide-[#ECEFF1] text-xs">
                     <div className="bg-[#1D0A69] text-white px-4 py-2 font-bold flex items-center justify-between">
                       <span>Application #{applicationNumber}</span>
-                      <span className="bg-[#FFC107] text-[#120538] font-bold px-2 py-0.5 rounded text-[10px]">
-                        Ready for Submission
-                      </span>
+                      {checkingReadiness ? (
+                        <span className="bg-[#ECEFF1] text-[#263238] font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3 animate-spin" /> Verifying Readiness...
+                        </span>
+                      ) : readinessData?.is_ready ? (
+                        <span className="bg-[#2E7D32] text-white font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Ready for Submission
+                        </span>
+                      ) : (
+                        <span className="bg-[#C85A17] text-white font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Action Required Before Submission
+                        </span>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-3 p-3 bg-white">
@@ -865,7 +1035,9 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
 
                     <div className="grid grid-cols-3 p-3 bg-white">
                       <span className="font-semibold text-[#546E7A]">Institution & Course</span>
-                      <span className="col-span-2 text-[#263238]">{institutionName} — {courseName}</span>
+                      <span className="col-span-2 text-[#263238]">
+                        {isOverseasScheme ? `${foreignUniversity} (${studyDestination})` : institutionName} — {courseName}
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-3 p-3 bg-[#F8F9FA]">
@@ -880,6 +1052,52 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {readinessData && !readinessData.is_ready && (
+                    <div className="p-4 rounded-xl border border-[#EF9A9A] bg-[#FFEBEE] text-[#C62828] text-xs space-y-2">
+                      <div className="font-bold flex items-center gap-2 text-sm text-[#B71C1C]">
+                        <AlertCircle className="w-4 h-4 text-[#D32F2F] flex-shrink-0" />
+                        <span>Submission Incomplete — Required Actions</span>
+                      </div>
+                      <p className="text-[11px] text-[#5D4037]">
+                        {readinessData.message}
+                      </p>
+                      {readinessData.missing_fields && readinessData.missing_fields.length > 0 && (
+                        <div>
+                          <p className="font-bold text-[#B71C1C]">Missing Mandatory Fields:</p>
+                          <ul className="list-disc pl-5 mt-1 space-y-0.5 text-[11px]">
+                            {readinessData.missing_fields.map((f: string) => (
+                              <li key={f} className="capitalize">{f.replace(/_/g, ' ')}</li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentStep(2)}
+                            className="mt-1.5 text-xs font-bold text-[#1D0A69] underline hover:text-[#0D004D]"
+                          >
+                            → Go to Step 2 to enter required information
+                          </button>
+                        </div>
+                      )}
+                      {readinessData.missing_documents && readinessData.missing_documents.length > 0 && (
+                        <div>
+                          <p className="font-bold text-[#B71C1C]">Missing Mandatory Documents:</p>
+                          <ul className="list-disc pl-5 mt-1 space-y-0.5 text-[11px]">
+                            {readinessData.missing_documents.map((d: string) => (
+                              <li key={d} className="font-mono">{d.replace(/_/g, ' ')}</li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentStep(4)}
+                            className="mt-1.5 text-xs font-bold text-[#1D0A69] underline hover:text-[#0D004D]"
+                          >
+                            → Go to Step 4 to upload or link documents
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="p-4 rounded-xl border border-[#FFE082] bg-[#FFF9C4] text-[#5D4037] text-xs space-y-1.5">
                     <div className="flex items-center gap-2 font-bold text-[#7A5E00]">

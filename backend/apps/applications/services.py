@@ -19,6 +19,13 @@ from apps.workflow.models import WorkflowState, ApplicationStatusHistory
 from apps.audit.models import AuditLog, AuditAction
 
 
+class ApplicationSubmissionError(Exception):
+    def __init__(self, data: Dict[str, Any], status_code: int = 400):
+        self.data = data
+        self.status_code = status_code
+        super().__init__(str(data))
+
+
 class FieldConflictService:
     """
     Detects and manages contradictions across data sources (e.g. APPLICANT vs OCR vs DOCUMENT).
@@ -319,35 +326,53 @@ class SubmissionService:
 
             is_valid, validation_errors = ApplicationFormValidator.validate_submission(
                 scheme_version=app.scheme_version,
-                submitted_data=data_for_validation
+                submitted_data=data_for_validation,
+                is_partial=False
             )
             if not is_valid:
                 field_errors = {}
                 for err in validation_errors:
                     field_errors.setdefault(err["field"], []).append(err["message"])
-                raise ValidationError({
+                raise ApplicationSubmissionError({
                     "status": "VALIDATION_FAILED",
                     "field_errors": field_errors,
-                    "errors": validation_errors
-                })
+                    "errors": validation_errors,
+                    "message": f"Validation failed: {validation_errors[0]['message'] if validation_errors else 'Please complete all required fields.'}"
+                }, status_code=400)
 
             # 4. Mandatory Document Requirements Validation
+            DOC_ALIASES = {
+                'ADMISSION_OFFER': {'ADMISSION_OFFER', 'ADMISSION_LETTER'},
+                'ADMISSION_LETTER': {'ADMISSION_OFFER', 'ADMISSION_LETTER'},
+                'CASTE_CERTIFICATE': {'CASTE_CERTIFICATE', 'COMMUNITY_CERTIFICATE'},
+                'COMMUNITY_CERTIFICATE': {'CASTE_CERTIFICATE', 'COMMUNITY_CERTIFICATE'},
+            }
             doc_reqs = DocumentRequirement.objects.filter(
                 scheme_version=app.scheme_version,
                 required=True,
                 when_required='APPLICATION'
             )
-            uploaded_types = set(app.applicant.user.uploaded_documents.values_list('document_type', flat=True))
-            missing_docs = [
-                d_req.document_type for d_req in doc_reqs
-                if d_req.document_type not in uploaded_types
-            ]
+            uploaded_types = set(app.applicant.user.uploaded_documents.filter(
+                lifecycle_status__in=['SAFE', 'PROCESSING', 'PROCESSED', 'VERIFIED']
+            ).values_list('document_type', flat=True))
+            if hasattr(app, 'documents'):
+                uploaded_types.update(app.documents.filter(
+                    lifecycle_status__in=['SAFE', 'PROCESSING', 'PROCESSED', 'VERIFIED']
+                ).values_list('document_type', flat=True))
+
+            missing_docs = []
+            for d_req in doc_reqs:
+                req_type = d_req.document_type
+                aliases = DOC_ALIASES.get(req_type, {req_type})
+                if not any(alias in uploaded_types for alias in aliases):
+                    missing_docs.append(req_type)
+
             if missing_docs:
-                raise ValidationError({
+                raise ApplicationSubmissionError({
                     "status": "MISSING_DOCUMENTS",
                     "missing_documents": missing_docs,
                     "message": f"Mandatory documents missing: {', '.join(missing_docs)}"
-                })
+                }, status_code=400)
 
             # 5. Duplicate & Conflict Detection
             dup_info = DuplicateDetectionService.check_duplicates(app)

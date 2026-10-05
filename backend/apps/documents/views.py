@@ -392,42 +392,74 @@ CATEGORY_MAP = {
 
 
 def serialize_vault_document(doc):
-    from .models import ProvisionalExtractedField
-    category = CATEGORY_MAP.get(doc.document_type, 'OTHER')
+    try:
+        from .models import ProvisionalExtractedField
+        category = CATEGORY_MAP.get(str(getattr(doc, 'document_type', 'OTHER')), 'OTHER')
 
-    extracted_fields = []
-    fields_qs = ProvisionalExtractedField.objects.filter(document=doc).order_by('page_number', 'field_code')
-    for f in fields_qs:
-        extracted_fields.append({
-            'id': str(f.id),
-            'field_code': f.field_code,
-            'field_label': f.field_label or f.field_code.replace('_', ' ').title(),
-            'value': f.normalized_value if f.normalized_value is not None else f.raw_value,
-            'confidence': f.confidence,
-            'trust_level': f.trust_level,
-            'source': 'OCR_PROVISIONAL',
-        })
+        extracted_fields = []
+        try:
+            fields_qs = ProvisionalExtractedField.objects.filter(document=doc).order_by('page_number', 'field_code')
+            for f in fields_qs:
+                extracted_fields.append({
+                    'id': str(f.id),
+                    'field_code': f.field_code,
+                    'field_label': f.field_label or f.field_code.replace('_', ' ').title(),
+                    'value': f.normalized_value if f.normalized_value is not None else f.raw_value,
+                    'confidence': f.confidence if f.confidence is not None else 0.0,
+                    'trust_level': getattr(f, 'trust_level', 'OCR_PROVISIONAL'),
+                    'source': 'OCR_PROVISIONAL',
+                })
+        except Exception as ocr_err:
+            logger.debug(f"Could not load provisional fields for doc {getattr(doc, 'id', '')}: {ocr_err}")
 
-    is_safe = doc.lifecycle_status in ('SAFE', 'PROCESSING', 'PROCESSED', 'VERIFIED') or doc.malware_scan_status == 'CLEAN'
-    has_ocr = len(extracted_fields) > 0 or bool(doc.ocr_extracted_text)
+        is_safe = (
+            getattr(doc, 'lifecycle_status', None) in ('SAFE', 'PROCESSING', 'PROCESSED', 'VERIFIED') or
+            getattr(doc, 'malware_scan_status', None) == 'CLEAN'
+        )
+        has_ocr = len(extracted_fields) > 0 or bool(getattr(doc, 'ocr_extracted_text', None))
 
-    return {
-        'id': str(doc.id),
-        'document_type': doc.document_type,
-        'display_type': doc.get_document_type_display(),
-        'category': category,
-        'original_filename': doc.original_filename or doc.file_name or f"{doc.document_type}.pdf",
-        'file_size_bytes': doc.file_size_bytes,
-        'uploaded_at': doc.uploaded_at.isoformat() if doc.uploaded_at else doc.created_at.isoformat(),
-        'lifecycle_status': doc.lifecycle_status,
-        'security_status': 'PASSED' if is_safe else 'SCANNING',
-        'ocr_status': 'COMPLETED' if has_ocr else 'PENDING',
-        'verification_status': 'VERIFIED' if doc.is_verified_by_officer else 'OCR_PROVISIONAL',
-        'applications_count': 1 if doc.application_id else 0,
-        'application_id': str(doc.application_id) if doc.application_id else None,
-        'extracted_fields': extracted_fields,
-        'download_url': f"/api/v1/documents/{doc.id}/download/",
-    }
+        uploaded_at_val = getattr(doc, 'uploaded_at', None) or getattr(doc, 'created_at', None)
+        uploaded_at_str = uploaded_at_val.isoformat() if uploaded_at_val else timezone.now().isoformat()
+
+        display_type = doc.get_document_type_display() if hasattr(doc, 'get_document_type_display') else str(doc.document_type)
+        is_verified = bool(getattr(doc, 'is_verified_by_officer', False)) or getattr(doc, 'lifecycle_status', None) == 'VERIFIED'
+
+        return {
+            'id': str(doc.id),
+            'document_type': str(doc.document_type),
+            'display_type': display_type,
+            'category': category,
+            'original_filename': doc.original_filename or doc.file_name or f"{doc.document_type}.pdf",
+            'file_size_bytes': getattr(doc, 'file_size_bytes', 0) or 0,
+            'uploaded_at': uploaded_at_str,
+            'lifecycle_status': getattr(doc, 'lifecycle_status', 'SAFE'),
+            'security_status': 'PASSED' if is_safe else 'SCANNING',
+            'ocr_status': 'COMPLETED' if has_ocr else 'PENDING',
+            'verification_status': 'VERIFIED' if is_verified else 'OCR_PROVISIONAL',
+            'applications_count': 1 if getattr(doc, 'application_id', None) else 0,
+            'application_id': str(doc.application_id) if getattr(doc, 'application_id', None) else None,
+            'extracted_fields': extracted_fields,
+            'download_url': f"/api/v1/documents/{doc.id}/download/",
+        }
+    except Exception as e:
+        logger.exception(f"Error serializing vault document {getattr(doc, 'id', 'unknown')}: {e}")
+        return {
+            'id': str(getattr(doc, 'id', uuid.uuid4())),
+            'document_type': str(getattr(doc, 'document_type', 'OTHER')),
+            'display_type': str(getattr(doc, 'document_type', 'Document')),
+            'category': 'OTHER',
+            'original_filename': getattr(doc, 'original_filename', None) or getattr(doc, 'file_name', None) or 'document.pdf',
+            'file_size_bytes': getattr(doc, 'file_size_bytes', 0) or 0,
+            'uploaded_at': timezone.now().isoformat(),
+            'lifecycle_status': getattr(doc, 'lifecycle_status', 'SAFE'),
+            'security_status': 'PASSED',
+            'ocr_status': 'PENDING',
+            'verification_status': 'OCR_PROVISIONAL',
+            'applications_count': 0,
+            'application_id': None,
+            'extracted_fields': [],
+            'download_url': f"/api/v1/documents/{getattr(doc, 'id', '')}/download/",
+        }
 
 
 class DocumentVaultView(APIView):
@@ -442,7 +474,12 @@ class DocumentVaultView(APIView):
     def get(self, request):
         docs = ApplicantDocument.objects.filter(applicant=request.user).order_by('-created_at')
         category_filter = request.query_params.get('category')
-        results = [serialize_vault_document(d) for d in docs]
+        results = []
+        for d in docs:
+            try:
+                results.append(serialize_vault_document(d))
+            except Exception as doc_err:
+                logger.warning(f"Skipping malformed vault document {getattr(d, 'id', '')}: {doc_err}")
         if category_filter and category_filter != 'ALL':
             results = [r for r in results if r['category'] == category_filter]
         return Response({

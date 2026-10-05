@@ -18,6 +18,11 @@ class ObjectStorage(ABC):
         pass
 
     @abstractmethod
+    def put_safe(self, document_id: str, content: bytes, filename: str, application_id: str = 'vault') -> str:
+        """Stores verified or vault-uploaded safe file directly in safe storage. Returns storage_key."""
+        pass
+
+    @abstractmethod
     def promote_to_safe(self, document_id: str, application_id: str, filename: str) -> str:
         """Promotes safe verified file from quarantine into final document storage."""
         pass
@@ -71,6 +76,15 @@ class LocalObjectStorage(ObjectStorage):
         target_path = doc_q_dir / safe_name
         target_path.write_bytes(content)
         return f"quarantine/{document_id}/{safe_name}"
+
+    def put_safe(self, document_id: str, content: bytes, filename: str, application_id: str = 'vault') -> str:
+        safe_name = os.path.basename(filename) or "document.bin"
+        app_str = str(application_id or 'vault')
+        safe_target_dir = self.safe_dir / app_str / str(document_id)
+        safe_target_dir.mkdir(parents=True, exist_ok=True)
+        safe_target_path = safe_target_dir / safe_name
+        safe_target_path.write_bytes(content)
+        return f"documents/{app_str}/{document_id}/{safe_name}"
 
     def promote_to_safe(self, document_id: str, application_id: str, filename: str) -> str:
         safe_name = os.path.basename(filename) or "document.bin"
@@ -192,6 +206,19 @@ class S3CompatibleObjectStorage(ObjectStorage):
             Metadata={'document_id': str(document_id)}
         )
         return storage_key
+
+    def put_safe(self, document_id: str, content: bytes, filename: str, application_id: str = 'vault') -> str:
+        safe_name = os.path.basename(filename) or "document.bin"
+        app_str = str(application_id or 'vault')
+        safe_key = f"documents/{app_str}/{document_id}/{safe_name}"
+        self.client.put_object(
+            Bucket=self.bucket_name,
+            Key=safe_key,
+            Body=content,
+            ServerSideEncryption='AES256',
+            Metadata={'document_id': str(document_id), 'application_id': app_str}
+        )
+        return safe_key
 
     def promote_to_safe(self, document_id: str, application_id: str, filename: str) -> str:
         safe_name = os.path.basename(filename) or "document.bin"

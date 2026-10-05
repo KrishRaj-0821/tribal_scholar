@@ -147,10 +147,16 @@ class ApplicationFormValidator:
     def validate_submission(
         cls,
         scheme_version: SchemeVersion,
-        submitted_data: Dict[str, Any]
+        submitted_data: Dict[str, Any],
+        is_partial: bool = False
     ) -> Tuple[bool, List[Dict[str, Any]]]:
         """
         Validates all submitted field values against scheme version field definitions.
+        When is_partial=True (e.g. saving draft progress), required fields that are not
+        yet provided are not flagged as errors; only fields with non-empty values are validated
+        for type, format, range, and allowed options.
+        When is_partial=False (e.g. final submission or readiness check), all required fields
+        governed by the scheme version are strictly enforced.
         Returns (is_valid, errors_list).
         """
         errors = []
@@ -176,8 +182,8 @@ class ApplicationFormValidator:
             value = submitted_data.get(code)
             is_empty = value is None or (isinstance(value, str) and value.strip() == "")
 
-            # 1. Required Check
-            if fdef.required and is_empty:
+            # 1. Required Check (only on complete submission/readiness check)
+            if not is_partial and fdef.required and is_empty:
                 errors.append({
                     "field": code,
                     "error_type": "REQUIRED_FIELD_MISSING",

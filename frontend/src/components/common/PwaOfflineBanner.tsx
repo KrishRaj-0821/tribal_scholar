@@ -19,24 +19,35 @@ export const PwaOfflineBanner: React.FC = () => {
       setShowInstallBanner(true);
     };
 
+    const handleAppInstalled = () => {
+      setShowInstallBanner(false);
+      setInstallPrompt(null);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
-  const handleInstallClick = () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      installPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          setShowInstallBanner(false);
-        }
-        setInstallPrompt(null);
-      });
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    try {
+      await installPrompt.prompt();
+      const choiceResult = await installPrompt.userChoice;
+      if (choiceResult?.outcome === 'accepted') {
+        setShowInstallBanner(false);
+      }
+    } catch (err) {
+      console.warn('PWA install prompt error:', err);
+    } finally {
+      setInstallPrompt(null);
+      setShowInstallBanner(false);
     }
   };
 

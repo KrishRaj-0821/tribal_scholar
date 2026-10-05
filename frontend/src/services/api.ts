@@ -90,10 +90,34 @@ export async function fetchApi<T = any>(
   }
 
   if (!response.ok) {
-    const errorMsg = 
-      (typeof data === 'object' && (data.error || data.message || data.detail)) || 
-      (typeof data === 'string' ? data : `API Error (${response.status})`);
-    const err = new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+    let errorMsg = '';
+    if (typeof data === 'object' && data !== null) {
+      if (data.message && typeof data.message === 'string') {
+        errorMsg = data.message;
+      } else if (data.field_errors && typeof data.field_errors === 'object') {
+        const fieldMsgs = Object.entries(data.field_errors).map(([field, msgs]: [string, any]) => {
+          const m = Array.isArray(msgs) ? msgs.join(', ') : String(msgs);
+          return `${field.replace(/_/g, ' ')}: ${m}`;
+        });
+        errorMsg = fieldMsgs.join(' | ');
+      } else if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+        errorMsg = data.errors.map((e: any) => e.message || JSON.stringify(e)).join(' | ');
+      } else if (data.missing_documents && Array.isArray(data.missing_documents)) {
+        errorMsg = `Mandatory documents missing: ${data.missing_documents.join(', ')}`;
+      } else if (data.error) {
+        errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+      } else if (data.detail) {
+        errorMsg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+      }
+    } else if (typeof data === 'string' && data.trim()) {
+      errorMsg = data;
+    }
+
+    if (!errorMsg) {
+      errorMsg = `API Error (${response.status})`;
+    }
+
+    const err = new Error(errorMsg);
     (err as any).status = response.status;
     (err as any).data = data;
     throw err;
@@ -315,6 +339,18 @@ export const applicationApi = {
       method: 'POST',
       body: formData,
     });
+  },
+
+  getReadiness: async (applicationId: string) => {
+    return await fetchApi<{
+      is_ready: boolean;
+      status: 'READY' | 'NOT_READY';
+      missing_fields: string[];
+      missing_documents: string[];
+      field_errors: Record<string, string[]>;
+      errors: any[];
+      message: string;
+    }>(`/api/v1/applications/${applicationId}/readiness/`);
   },
 };
 

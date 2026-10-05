@@ -22,7 +22,7 @@ from .serializers import (
 from .form_services import (
     FieldTrustResolver, ApplicationFormValidator, DynamicFormGenerator
 )
-from .services import FieldConflictService, DuplicateDetectionService, SubmissionService
+from .services import FieldConflictService, DuplicateDetectionService, SubmissionService, ApplicationSubmissionError
 from apps.schemes.models import SchemeVersion
 from apps.schemes.evaluator import RuleEvaluationService
 from apps.workflow.models import WorkflowState
@@ -203,7 +203,8 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         # Authoritative Server-Side Form Validation (Part 13)
         is_valid, validation_errors = ApplicationFormValidator.validate_submission(
             scheme_version=application.scheme_version,
-            submitted_data=merged_for_validation
+            submitted_data=merged_for_validation,
+            is_partial=True
         )
 
         if not is_valid:
@@ -213,7 +214,8 @@ class ApplicationViewSet(viewsets.ModelViewSet):
             return Response({
                 "status": "VALIDATION_FAILED",
                 "field_errors": field_errors,
-                "errors": validation_errors
+                "errors": validation_errors,
+                "message": f"Validation failed: {validation_errors[0]['message'] if validation_errors else 'Invalid field value'}"
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Determine source
@@ -313,17 +315,99 @@ class ApplicationViewSet(viewsets.ModelViewSet):
                 request_path=request.path
             )
             return Response(receipt, status=status_code)
+        except ApplicationSubmissionError as e:
+            return Response(e.data, status=e.status_code)
         except (ValidationError, DjangoValidationError) as e:
-            msg = e.message_dict if hasattr(e, 'message_dict') else (e.messages if hasattr(e, 'messages') else str(e))
+            detail = getattr(e, 'detail', None) or getattr(e, 'message_dict', None) or getattr(e, 'messages', None) or str(e)
             return Response(
-                {"error": msg},
+                {
+                    "status": "VALIDATION_FAILED",
+                    "error": detail,
+                    "message": str(detail)
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         except (PermissionDenied, DjangoPermissionDenied) as e:
             return Response(
-                {"error": str(e)},
+                {"status": "PERMISSION_DENIED", "error": str(e), "message": str(e)},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+    # -------------------------------------------------------------------------
+    # AUTHORITATIVE READINESS EVALUATION
+    # -------------------------------------------------------------------------
+    @action(detail=True, methods=['get'], url_path='readiness')
+    def readiness(self, request, pk=None):
+        """
+        GET /api/v1/applications/{id}/readiness/
+        Authoritative validation of application submission readiness.
+        """
+        application = self.get_object()
+        effective_map = FieldTrustResolver.get_effective_values(application)
+        data_for_validation = {k: v['value'] for k, v in effective_map.items()}
+        if application.applicant:
+            data_for_validation.setdefault('annual_family_income', float(application.applicant.annual_family_income or 0))
+            data_for_validation.setdefault('community', application.applicant.community)
+
+        is_valid, validation_errors = ApplicationFormValidator.validate_submission(
+            scheme_version=application.scheme_version,
+            submitted_data=data_for_validation,
+            is_partial=False
+        )
+        field_errors = {}
+        missing_fields = []
+        for err in validation_errors:
+            field_errors.setdefault(err["field"], []).append(err["message"])
+            if err.get("error_type") == "REQUIRED_FIELD_MISSING":
+                missing_fields.append(err["field"])
+
+        from apps.documents.models import DocumentRequirement
+        DOC_ALIASES = {
+            'ADMISSION_OFFER': {'ADMISSION_OFFER', 'ADMISSION_LETTER'},
+            'ADMISSION_LETTER': {'ADMISSION_OFFER', 'ADMISSION_LETTER'},
+            'CASTE_CERTIFICATE': {'CASTE_CERTIFICATE', 'COMMUNITY_CERTIFICATE'},
+            'COMMUNITY_CERTIFICATE': {'CASTE_CERTIFICATE', 'COMMUNITY_CERTIFICATE'},
+        }
+
+        doc_reqs = DocumentRequirement.objects.filter(
+            scheme_version=application.scheme_version,
+            required=True,
+            when_required='APPLICATION'
+        )
+        uploaded_types = set(application.applicant.user.uploaded_documents.filter(
+            lifecycle_status__in=['SAFE', 'PROCESSING', 'PROCESSED', 'VERIFIED']
+        ).values_list('document_type', flat=True))
+        if hasattr(application, 'documents'):
+            uploaded_types.update(application.documents.filter(
+                lifecycle_status__in=['SAFE', 'PROCESSING', 'PROCESSED', 'VERIFIED']
+            ).values_list('document_type', flat=True))
+
+        missing_docs = []
+        for d_req in doc_reqs:
+            req_type = d_req.document_type
+            aliases = DOC_ALIASES.get(req_type, {req_type})
+            if not any(alias in uploaded_types for alias in aliases):
+                missing_docs.append(req_type)
+
+        is_ready = is_valid and len(missing_docs) == 0
+
+        messages = []
+        if missing_fields:
+            messages.append(f"Required fields missing: {', '.join(missing_fields)}")
+        if missing_docs:
+            messages.append(f"Mandatory documents missing: {', '.join(missing_docs)}")
+        if not messages and not is_ready:
+            messages.append("Please resolve field validation errors before submitting.")
+
+        return Response({
+            "is_ready": is_ready,
+            "status": "READY" if is_ready else "NOT_READY",
+            "missing_fields": missing_fields,
+            "missing_documents": missing_docs,
+            "field_errors": field_errors,
+            "errors": validation_errors,
+            "message": "Application is complete and ready for submission." if is_ready else " | ".join(messages)
+        }, status=status.HTTP_200_OK)
 
     # -------------------------------------------------------------------------
     # SUBMISSION SNAPSHOT VIEWING (Part 8 & 9)
