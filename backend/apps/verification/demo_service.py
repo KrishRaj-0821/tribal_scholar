@@ -156,11 +156,14 @@ class DemoScenarioService:
                 "last_name": "Applicant",
                 "email": "demo.applicant@mota.gov.in",
                 "role": UserRole.APPLICANT,
+                "phone_number": "9122671902",
                 "is_verified": True
             }
         )
         if applicant_user.role != UserRole.APPLICANT:
             applicant_user.role = UserRole.APPLICANT
+        if not applicant_user.phone_number:
+            applicant_user.phone_number = "9122671902"
         applicant_user.set_password("Tribal@2026")
         applicant_user.save()
 

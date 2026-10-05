@@ -149,10 +149,10 @@ export const authApi = {
     return await fetchApi<{ user: any; token?: string }>('/api/v1/auth/me/');
   },
 
-  requestOTP: async (mobile: string) => {
+  requestOTP: async (mobile: string, resend: boolean = false) => {
     return await fetchApi<{ message: string; mobile_masked: string }>('/api/v1/auth/request-otp/', {
       method: 'POST',
-      body: JSON.stringify({ mobile }),
+      body: JSON.stringify({ mobile, resend }),
     });
   },
 

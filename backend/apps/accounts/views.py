@@ -136,7 +136,11 @@ class RequestOTPView(APIView):
             )
 
         from apps.notifications.services import OTPService
-        success, msg, masked_phone = OTPService.generate_and_send_otp(str(mobile))
+        if request.data.get('resend'):
+            success, msg, masked_phone = OTPService.resend_otp(str(mobile))
+        else:
+            success, msg, masked_phone = OTPService.generate_and_send_otp(str(mobile))
+
         if not success:
             is_rate_limit = "wait" in msg.lower() or "recently" in msg.lower()
             return Response(

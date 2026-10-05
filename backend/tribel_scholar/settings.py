@@ -383,6 +383,12 @@ LOGGING = {
 # -----------------------------------------------------------------------------
 FAST2SMS_API_KEY = os.getenv('FAST2SMS_API_KEY', '')
 FAST2SMS_API_URL = os.getenv('FAST2SMS_API_URL', 'https://www.fast2sms.com/dev/bulkV2')
+FAST2SMS_OTP_URL = os.getenv('FAST2SMS_OTP_URL', 'https://www.fast2sms.com/dev/otp/send')
+FAST2SMS_OTP_RESEND_URL = os.getenv('FAST2SMS_OTP_RESEND_URL', 'https://www.fast2sms.com/dev/otp/resend')
+FAST2SMS_OTP_TEMPLATE_ID = os.getenv('FAST2SMS_OTP_TEMPLATE_ID', '')
+FAST2SMS_SENDER_ID = os.getenv('FAST2SMS_SENDER_ID', '')
+FAST2SMS_DLT_MESSAGE_ID = os.getenv('FAST2SMS_DLT_MESSAGE_ID', '')
+FAST2SMS_ENTITY_ID = os.getenv('FAST2SMS_ENTITY_ID', '')
 FAST2SMS_ENABLED = os.getenv('FAST2SMS_ENABLED', 'true').lower() in ('true', '1', 't', 'yes')
 FAST2SMS_ROUTE = os.getenv('FAST2SMS_ROUTE', 'q')
 FAST2SMS_TIMEOUT_SECONDS = int(os.getenv('FAST2SMS_TIMEOUT_SECONDS', '10'))

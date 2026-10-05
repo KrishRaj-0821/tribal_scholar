@@ -40,7 +40,8 @@ class NotificationService:
         application=None,
         recipient_user=None,
         idempotency_key: Optional[str] = None,
-        force_sync: bool = False
+        force_sync: bool = False,
+        **kwargs
     ) -> SMSNotification:
         """
         Core method to stage, deduplicate, and asynchronously dispatch an SMS notification.
@@ -80,20 +81,24 @@ class NotificationService:
             # Concurrent race caught by database unique constraint
             return SMSNotification.objects.get(idempotency_key=idempotency_key)
 
-        # 5. Dispatch via Celery upon transaction commit (or immediate fallback)
-        def trigger_dispatch():
-            if force_sync:
-                dispatch_sms_notification_task(
-                    notification_id=str(notification.id),
-                    phone_number=norm_phone,
-                    message=message
-                )
-            else:
+        # 5. Dispatch via Celery upon transaction commit (or immediate execution if force_sync)
+        if force_sync:
+            dispatch_sms_notification_task(
+                notification_id=str(notification.id),
+                phone_number=norm_phone,
+                message=message,
+                **kwargs
+            )
+            notification.refresh_from_db()
+            return notification
+        else:
+            def trigger_dispatch():
                 try:
                     dispatch_sms_notification_task.delay(
                         notification_id=str(notification.id),
                         phone_number=norm_phone,
-                        message=message
+                        message=message,
+                        **kwargs
                     )
                 except Exception as celery_err:
                     logger.warning(
@@ -104,11 +109,12 @@ class NotificationService:
                     dispatch_sms_notification_task(
                         notification_id=str(notification.id),
                         phone_number=norm_phone,
-                        message=message
+                        message=message,
+                        **kwargs
                     )
 
-        transaction.on_commit(trigger_dispatch)
-        return notification
+            transaction.on_commit(trigger_dispatch)
+            return notification
 
     # -------------------------------------------------------------------------
     # Application-Level Domain Event Notifications
@@ -296,16 +302,68 @@ class OTPService:
             "expiry_minutes": expiry_minutes
         })
 
-        NotificationService.send_sms(
+        notification = NotificationService.send_sms(
             phone_number=norm_phone,
             message=message,
             notification_type=SMSNotificationType.OTP,
             recipient_user=user,
             idempotency_key=f"otp:{norm_phone}:{int(now.timestamp())}",
-            force_sync=True  # OTP requires immediate dispatch
+            force_sync=True,  # OTP requires immediate synchronous dispatch
+            otp_code=otp_plaintext,
+            expiry_minutes=expiry_minutes
         )
 
+        if notification.status == SMSDeliveryStatus.FAILED:
+            # Clean up pending unverified OTP record since dispatch was rejected
+            OTPVerification.objects.filter(phone_number=norm_phone, is_verified=False).delete()
+            failure_msg = notification.failure_reason or "Fast2SMS rejected OTP dispatch."
+            logger.warning("OTP generation aborted due to provider dispatch failure for %s: %s", masked_phone, failure_msg)
+            return False, failure_msg, masked_phone
+
         return True, "One-Time Password has been dispatched to your mobile number.", masked_phone
+
+    @classmethod
+    def resend_otp(cls, raw_phone: str) -> Tuple[bool, str, str]:
+        """
+        Resends the active OTP for a mobile number.
+        Uses provider dedicated resend API (POST /dev/otp/resend) if configured,
+        or regenerates if within valid window.
+        Returns: (success, user_message, masked_phone)
+        """
+        try:
+            norm_phone = normalize_phone_number(raw_phone)
+        except ValueError as e:
+            return False, str(e), "******"
+
+        masked_phone = mask_phone_number(norm_phone)
+        now = timezone.now()
+
+        # Look for active unexpired, unverified OTP
+        active_record = OTPVerification.objects.filter(
+            phone_number=norm_phone,
+            is_verified=False,
+            expires_at__gte=now
+        ).order_by('-created_at').first()
+
+        if not active_record:
+            # If no active record, generate a fresh one
+            return cls.generate_and_send_otp(norm_phone)
+
+        # Check rate-limiting cooldown (60 seconds)
+        if active_record.created_at >= now - timedelta(seconds=60):
+            return False, "An OTP was recently requested. Please wait 60 seconds before retrying.", masked_phone
+
+        # Call provider resend if dedicated template is configured
+        provider = get_sms_provider()
+        if provider.otp_template_id:
+            result = provider.resend_otp(norm_phone)
+            if result.success:
+                return True, "OTP has been re-sent to your registered mobile number.", masked_phone
+            else:
+                return False, result.failure_reason or "Failed to resend OTP.", masked_phone
+        else:
+            # Fallback: re-issue fresh OTP
+            return cls.generate_and_send_otp(norm_phone)
 
     @classmethod
     def verify_otp(cls, raw_phone: str, otp_entered: str) -> Tuple[bool, str, Optional[User]]:

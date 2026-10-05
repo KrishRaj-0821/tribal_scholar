@@ -71,21 +71,46 @@ class RetrySMSNotificationView(generics.GenericAPIView):
 class WorkerEgressIPView(generics.GenericAPIView):
     """
     GET /api/v1/notifications/worker-egress-ip/
-    Dispatches check_worker_egress_ip_task to Celery and returns the worker's
-    live outbound egress IPv4 address from both api.ipify.org and ifconfig.me.
+    Inspects both the backend web service and Celery worker outbound egress IPs.
+    If ?probe=true is provided, executes probe_fast2sms_connectivity_task on worker.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from .tasks import check_worker_egress_ip_task
+        import urllib.request
+        from .tasks import check_worker_egress_ip_task, probe_fast2sms_connectivity_task
+
+        # 1. Backend web process egress IP
+        backend_ip = "unknown"
+        try:
+            req = urllib.request.Request('https://api.ipify.org', headers={'User-Agent': 'curl/8.0.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                backend_ip = resp.read().decode('utf-8').strip()
+        except Exception as e:
+            backend_ip = f"error: {str(e)}"
+
+        # 2. Celery worker egress IP
+        worker_data = {}
         try:
             async_res = check_worker_egress_ip_task.delay()
             worker_data = async_res.get(timeout=15)
-            return Response(worker_data, status=status.HTTP_200_OK)
         except Exception as exc:
-            return Response(
-                {"error": f"Failed to query worker egress IP: {str(exc)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            worker_data = {"error": f"Failed to query worker egress IP: {str(exc)}"}
+
+        response_data = {
+            "backend_egress_ip": backend_ip,
+            "worker_egress": worker_data,
+        }
+
+        # 3. Optional live Fast2SMS probe from worker
+        if request.query_params.get('probe') == 'true':
+            test_phone = request.query_params.get('phone', '9122671902')
+            try:
+                probe_res = probe_fast2sms_connectivity_task.delay(test_phone=test_phone)
+                response_data["fast2sms_worker_probe"] = probe_res.get(timeout=15)
+            except Exception as probe_err:
+                response_data["fast2sms_worker_probe"] = {"error": str(probe_err)}
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 

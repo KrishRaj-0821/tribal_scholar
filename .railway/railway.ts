@@ -63,6 +63,12 @@ export default defineRailway(() => {
       FAST2SMS_API_URL: "https://www.fast2sms.com/dev/bulkV2",
       FAST2SMS_ENABLED: "true",
       FAST2SMS_ROUTE: "q",
+      FAST2SMS_OTP_URL: "https://www.fast2sms.com/dev/otp/send",
+      FAST2SMS_OTP_RESEND_URL: "https://www.fast2sms.com/dev/otp/resend",
+      FAST2SMS_OTP_TEMPLATE_ID: preserve(),
+      FAST2SMS_SENDER_ID: preserve(),
+      FAST2SMS_DLT_MESSAGE_ID: preserve(),
+      FAST2SMS_ENTITY_ID: preserve(),
     },
   });
 
@@ -97,6 +103,12 @@ export default defineRailway(() => {
       FAST2SMS_API_URL: "https://www.fast2sms.com/dev/bulkV2",
       FAST2SMS_ENABLED: "true",
       FAST2SMS_ROUTE: "q",
+      FAST2SMS_OTP_URL: "https://www.fast2sms.com/dev/otp/send",
+      FAST2SMS_OTP_RESEND_URL: "https://www.fast2sms.com/dev/otp/resend",
+      FAST2SMS_OTP_TEMPLATE_ID: preserve(),
+      FAST2SMS_SENDER_ID: preserve(),
+      FAST2SMS_DLT_MESSAGE_ID: preserve(),
+      FAST2SMS_ENTITY_ID: preserve(),
     },
   });
 

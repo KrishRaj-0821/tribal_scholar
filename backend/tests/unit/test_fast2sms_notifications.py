@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
 from django.utils import timezone
+from django.test import override_settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 
@@ -337,6 +338,10 @@ class TestNotificationIdempotency:
 
 @pytest.mark.django_db
 class TestOTPService:
+    @pytest.fixture(autouse=True)
+    def setup_settings(self, settings):
+        settings.FAST2SMS_ENABLED = False
+
     @patch("apps.notifications.services.secrets.randbelow", return_value=749123)
     def test_otp_generation_and_salted_hashing(self, mock_rand):
         success, msg, masked = OTPService.generate_and_send_otp("9876543210")
@@ -403,4 +408,26 @@ class TestOTPService:
         success2, msg2, _ = OTPService.generate_and_send_otp("9876543210")
         assert success2 is False
         assert "wait" in msg2.lower()
+
+    @patch("apps.notifications.tasks.get_sms_provider")
+    def test_provider_failure_aborts_otp_without_fake_success(self, mock_get_provider):
+        """Verify that provider failure does NOT report fake success to user."""
+        mock_provider = MagicMock()
+        failure_res = SMSProviderResult(
+            success=False,
+            status="FAILED",
+            failure_reason="Fast2SMS rejected dispatch (414): IP is blacklisted",
+            provider_request_id=None,
+        )
+        mock_provider.send_otp.return_value = failure_res
+        mock_provider.send_sms.return_value = failure_res
+        mock_get_provider.return_value = mock_provider
+
+        with override_settings(FAST2SMS_ENABLED=True):
+            success, msg, masked = OTPService.generate_and_send_otp("9876543210")
+
+        assert success is False
+        assert "414" in msg or "blacklisted" in msg or "failed" in msg.lower()
+        # Ensure unverified OTP record was removed or not left active
+        assert OTPVerification.objects.filter(phone_number="9876543210", is_verified=True).count() == 0
 

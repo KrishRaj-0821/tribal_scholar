@@ -108,12 +108,13 @@ export const LoginView: React.FC = () => {
     setOtpMessage(null);
 
     try {
-      const res = await authApi.requestOTP(cleanMobile);
+      const res = await authApi.requestOTP(cleanMobile, otpSent);
       setOtpSent(true);
       setOtpCooldown(60);
       setOtpMessage(res.message || `OTP dispatched via SMS to ${res.mobile_masked}`);
     } catch (err: any) {
-      setOtpError(err.message || 'Failed to dispatch OTP. Please verify your mobile number or try again.');
+      const msg = err.message || (err.data && (err.data.error || err.data.message)) || 'SMS service is temporarily unavailable. Please try again.';
+      setOtpError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setOtpSending(false);
     }

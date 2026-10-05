@@ -1,8 +1,8 @@
 import logging
 from celery import shared_task
 from django.utils import timezone
-from .models import SMSNotification, SMSDeliveryStatus
-from .providers.fast2sms import Fast2SMSProvider, get_sms_provider
+from .models import SMSNotification, SMSDeliveryStatus, SMSNotificationType
+from .providers.fast2sms import Fast2SMSProvider, get_sms_provider, mask_phone_number
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,15 @@ logger = logging.getLogger(__name__)
     retry_backoff_max=120,
     acks_late=True
 )
-def dispatch_sms_notification_task(self, notification_id: str, phone_number: str, message: str):
+def dispatch_sms_notification_task(
+    self,
+    notification_id: str,
+    phone_number: str,
+    message: str,
+    otp_code: str = '',
+    expiry_minutes: int = 5,
+    **kwargs
+):
     """
     Asynchronous Celery task for delivering an SMS via Fast2SMS.
     Updates the persistent SMSNotification delivery record and handles bounded retries.
@@ -35,7 +43,22 @@ def dispatch_sms_notification_task(self, notification_id: str, phone_number: str
     notification.save(update_fields=['status'])
 
     provider = get_sms_provider()
-    result = provider.send_sms(phone_number=phone_number, message=message)
+
+    # Route OTP via send_otp if this is an OTP notification and code is provided
+    if notification.notification_type == SMSNotificationType.OTP and otp_code:
+        result = provider.send_otp(
+            phone_number=phone_number,
+            otp_code=otp_code,
+            expiry_minutes=expiry_minutes,
+            message=message,
+            **kwargs
+        )
+    else:
+        result = provider.send_sms(
+            phone_number=phone_number,
+            message=message,
+            **kwargs
+        )
 
     if result.success:
         notification.status = SMSDeliveryStatus.SENT_TO_PROVIDER if result.status == 'SENT_TO_PROVIDER' else SMSDeliveryStatus.DEV_SKIPPED
@@ -49,7 +72,7 @@ def dispatch_sms_notification_task(self, notification_id: str, phone_number: str
         # Transient failure (network/5xx) -> trigger Celery retry
         notification.status = SMSDeliveryStatus.RETRY_PENDING
         notification.failure_reason = result.failure_reason or 'Transient network/gateway error'
-        notification.retry_count = self.request.retries + 1
+        notification.retry_count = getattr(self.request, 'retries', 0) + 1
         notification.save(update_fields=['status', 'failure_reason', 'retry_count'])
 
         logger.warning(
@@ -66,7 +89,7 @@ def dispatch_sms_notification_task(self, notification_id: str, phone_number: str
             notification.save(update_fields=['status', 'failure_reason'])
             logger.error("SMSNotification %s permanently failed after max retries.", notification_id)
     else:
-        # Permanent failure (invalid number, client 4xx, etc.) -> DO NOT retry
+        # Permanent failure (invalid number, client 4xx, IP restriction, balance, KYC) -> DO NOT retry
         notification.status = SMSDeliveryStatus.FAILED
         notification.failure_reason = result.failure_reason or 'Provider rejected message'
         notification.save(update_fields=['status', 'failure_reason'])
@@ -103,4 +126,29 @@ def check_worker_egress_ip_task(self):
         "error" not in results.get("api_ipify", "")
     )
     return results
+
+
+@shared_task(bind=True)
+def probe_fast2sms_connectivity_task(self, test_phone: str = "9122671902"):
+    """
+    Diagnostic Celery task executed directly on the Celery worker container
+    to verify Fast2SMS API communication and report provider responses safely.
+    Masks PII, never logs API keys.
+    """
+    from .providers.fast2sms import get_sms_provider, mask_phone_number
+    provider = get_sms_provider()
+    masked = mask_phone_number(test_phone)
+    result = provider.send_sms(
+        phone_number=test_phone,
+        message="MoTA Tribal Scholar Worker Connectivity Probe."
+    )
+    return {
+        "success": result.success,
+        "status": result.status,
+        "masked_phone": masked,
+        "provider_request_id": result.provider_request_id,
+        "message": result.message,
+        "failure_reason": result.failure_reason,
+        "raw_response": result.raw_response,
+    }
 
