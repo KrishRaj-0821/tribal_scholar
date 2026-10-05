@@ -15,9 +15,7 @@
 | Portal / Service | Direct URL | Description |
 | :--- | :--- | :--- |
 | **🚀 Live Tribal Scholar Portal (PWA)** | **[https://tribalscholar.up.railway.app](https://tribalscholar.up.railway.app)** | Production web application for ST applicants & scrutiny officers |
-| **⚡ Live Backend API Root** | **[https://backend-production-ba69a.up.railway.app/api/v1/](https://backend-production-ba69a.up.railway.app/api/v1/)** | Authoritative REST API service |
-| **📜 Live Statutory Schemes API** | **[https://backend-production-ba69a.up.railway.app/api/v1/schemes/](https://backend-production-ba69a.up.railway.app/api/v1/schemes/)** | Real-time statutory rules and quota listings |
-| **💚 Live API Health Liveness Probe** | **[https://backend-production-ba69a.up.railway.app/health/live/](https://backend-production-ba69a.up.railway.app/health/live/)** | Real-time service uptime verification |
+
 | **📋 Comprehensive QA Audit Report** | **[docs/LIVE_APPLICATION_QA_REPORT.md](docs/LIVE_APPLICATION_QA_REPORT.md)** | End-to-end audit with live telecom SMS dispatch & OCR telemetry |
 
 ---
