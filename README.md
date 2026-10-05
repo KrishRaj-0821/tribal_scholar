@@ -1,309 +1,266 @@
 # 🏛️ Tribal Scholar: AI-Enabled National Scholarship & Fellowship Management System
 ### Ministry of Tribal Affairs (MoTA), Government of India — Smart India Hackathon (SIH Problem Statement 26239)
 
-[![Deployment Status](https://img.shields.io/badge/Deployment-Live%20on%20Railway-success?style=for-the-badge&logo=railway)](https://tribalscholar.up.railway.app)
+[![Deployment Status](https://img.shields.io/badge/Deployment-Live%20Application-success?style=for-the-badge&logo=railway)](https://tribalscholar.up.railway.app)
 [![API Health](https://img.shields.io/badge/Backend%20API-Online%20(HTTP%20200)-blue?style=for-the-badge&logo=django)](https://backend-production-ba69a.up.railway.app/health/live/)
 [![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20TypeScript%20%2B%20PWA-61DAFB?style=for-the-badge&logo=react)](https://tribalscholar.up.railway.app)
 [![Backend](https://img.shields.io/badge/Backend-Django%205.1%20%2B%20DRF-092E20?style=for-the-badge&logo=django)](https://backend-production-ba69a.up.railway.app)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
-[![Async](https://img.shields.io/badge/Async%20Worker-Celery%20%2B%20Redis-37814A?style=for-the-badge&logo=celery)](https://docs.celeryq.dev/)
 [![Compliance](https://img.shields.io/badge/Accessibility-GIGW%203.0%20%2F%20WCAG%202.1%20AA-orange?style=for-the-badge)](https://guidelines.india.gov.in/)
 
 ---
 
-## 🌐 Live Production Deployment Links
+## 🌐 Live Application Links
 
-| Resource | Target URL | Description & Health Status |
+| Portal / Service | Direct URL | Description |
 | :--- | :--- | :--- |
-| **🚀 Public Portal (PWA)** | [https://tribalscholar.up.railway.app](https://tribalscholar.up.railway.app) | Production Progressive Web App for Scheduled Tribe applicants & scrutiny officers |
-| **⚡ Authoritative Backend API** | [https://backend-production-ba69a.up.railway.app/api/v1/](https://backend-production-ba69a.up.railway.app/api/v1/) | Central REST API root with JSON schema contracts |
-| **💚 Liveness Health Probe** | [https://backend-production-ba69a.up.railway.app/health/live/](https://backend-production-ba69a.up.railway.app/health/live/) | Monitored uptime probe (`HTTP 200 OK`) |
-| **🩺 Readiness Health Probe** | [https://backend-production-ba69a.up.railway.app/health/ready/](https://backend-production-ba69a.up.railway.app/health/ready/) | Database, cache & worker connectivity readiness check |
-| **📜 Schemes Directory API** | [https://backend-production-ba69a.up.railway.app/api/v1/schemes/](https://backend-production-ba69a.up.railway.app/api/v1/schemes/) | Real-time statutory rules and quota listings |
-| **📋 End-to-End QA Report** | [docs/LIVE_APPLICATION_QA_REPORT.md](docs/LIVE_APPLICATION_QA_REPORT.md) | Verified audit with real telecom SMS dispatch & OCR telemetry |
+| **🚀 Live Tribal Scholar Portal (PWA)** | **[https://tribalscholar.up.railway.app](https://tribalscholar.up.railway.app)** | Production web application for ST applicants & scrutiny officers |
+| **⚡ Live Backend API Root** | **[https://backend-production-ba69a.up.railway.app/api/v1/](https://backend-production-ba69a.up.railway.app/api/v1/)** | Authoritative REST API service |
+| **📜 Live Statutory Schemes API** | **[https://backend-production-ba69a.up.railway.app/api/v1/schemes/](https://backend-production-ba69a.up.railway.app/api/v1/schemes/)** | Real-time statutory rules and quota listings |
+| **💚 Live API Health Liveness Probe** | **[https://backend-production-ba69a.up.railway.app/health/live/](https://backend-production-ba69a.up.railway.app/health/live/)** | Real-time service uptime verification |
+| **📋 Comprehensive QA Audit Report** | **[docs/LIVE_APPLICATION_QA_REPORT.md](docs/LIVE_APPLICATION_QA_REPORT.md)** | End-to-end audit with live telecom SMS dispatch & OCR telemetry |
 
 ---
 
 ## 👥 Instant Evaluation & Demo Personas
 
-For evaluators, jury members, and reviewers, the live deployment contains pre-seeded synthetic personas to test both student application and officer scrutiny workflows immediately:
+The live deployment comes pre-configured with synthetic personas for instant evaluation without manual registration:
 
-| Role | Username | Password | Key Workflows & Permissions |
+| Persona | Username | Password | Purpose & Accessible Workflows |
 | :--- | :--- | :--- | :--- |
-| **🎓 ST Student Applicant** | `demo_applicant` | `Tribal@2026` | Sovereign OTR profile, Scheme Discovery, Multi-Step Application Wizard, Document Vault with ClamAV status, Live SMS Audit Ledger |
-| **🛡️ District Scrutiny Officer** | `demo_officer` | `Officer@2026` | Scrutiny Desk (`/officer`), Priority Triage Queue (SLA countdowns, conflict alerts), Side-by-Side Verification Workbench with original certificate canvas & bounding box overlays |
+| **🎓 ST Student Applicant** | `demo_applicant` | `Tribal@2026` | Sovereign OTR Profile, Scheme Matching, 5-Step Application Wizard, Document Vault with ClamAV status & OCR extraction, Live SMS Audit Ledger |
+| **🛡️ District Scrutiny Officer** | `demo_officer` | `Officer@2026` | District Scrutiny Desk (`/officer`), Priority Triage Queue, SLA Countdown, Interactive Side-by-Side Verification Workbench with bounding box overlays |
 
-> **Direct Mobile OTP Testing**: The portal supports live telecom SMS authentication powered by the Fast2SMS gateway. Register with any valid 10-digit Indian mobile number to receive live real-time OTPs and statutory SMS dispatch receipts.
-
----
-
-## 📖 Executive Summary & Problem Context
-
-The **Ministry of Tribal Affairs (MoTA)** oversees the socio-economic empowerment of India's Scheduled Tribes (ST). While flagship scholarship schemes provide critical financial lifelines, traditional delivery pipelines face substantial administrative hurdles:
-- **Disparate verification bottlenecks** across district and state welfare desks.
-- **Complex statutory criteria** (income ceilings, course eligibility, institution empanelment, academic year rule mutations).
-- **High vulnerability to document fraud** and certificate spoofing.
-- **Lack of affirmative action transparency** and real-time beneficiary tracking.
-
-**Tribal Scholar** addresses **SIH Problem Statement 26239** by delivering an enterprise-grade, rule-governed, AI-assisted sovereign portal. It unifies the entire scholarship lifecycle—from one-time registration and scheme-matching to OCR document intelligence, antivirus quarantine, deterministic statutory rule evaluation, officer scrutiny, and direct telecom SMS notifications.
+> **📲 Live Telecom SMS OTP Testing**: You can also register or log in with any valid 10-digit Indian mobile number. Real transactional OTPs and application dispatch receipts are sent directly to physical mobile phones via the **Fast2SMS** telecom gateway.
 
 ---
 
-## 🏛️ Flagship Statutory Schemes Administered
+## 📌 What is Tribal Scholar?
 
-The platform natively supports the official guidelines and gazette notifications for MoTA's primary schemes:
+**Tribal Scholar** is a sovereign, rule-governed, and AI-assisted scholarship administration ecosystem custom-built for the **Ministry of Tribal Affairs (MoTA), Government of India**.
 
-1. **NFST (National Fellowship for Higher Education of ST Students)**
-   - Full financial assistance to ST candidates pursuing regular M.Phil. and Ph.D. degrees in Sciences, Humanities, Engineering, and Technology.
-2. **TOP_CLASS (Top Class Education Scheme for ST Students)**
-   - Full tuition fee coverage and living allowances across premier institutes (IITs, IIMs, NITs, AIIMS, NLUs).
-3. **NOS (National Overseas Scholarship for ST Candidates)**
-   - Financial support for meritorious ST scholars admitted to top QS/Times Higher Education ranked international universities for Master's and Ph.D. programs.
-4. **Pre-Matric & Post-Matric ST Scholarships**
-   - Inter-state welfare schemes supporting secondary and higher secondary tribal education with Direct Benefit Transfer (DBT) readiness.
+Developed to solve **Smart India Hackathon (SIH) Problem Statement 26239**, Tribal Scholar modernizes the distribution and governance of central scholarships and fellowships for India's **10.4+ crore Scheduled Tribe (ST) citizens**.
 
----
-
-## ⚡ Core Innovations & Capabilities
-
-### 1. 🤖 Assistive AI & Dual-Engine Document Intelligence
-- **PaddleOCR + Tesseract Fallback**: Robust dual-engine optical character recognition tuned for bilingual Indian certificates (Devanagari script + English).
-- **Assistive AI Boundary**: AI models extract data (income, caste certificate number, issuing authority, dates) with confidence scoring. **Crucially, AI never has final rejection or selection authority**; ambiguous or low-confidence readings automatically trigger human-in-the-loop review.
-- **Field Conflict Resolution**: Visual bounding boxes map extracted values against user-declared values on an interactive side-by-side canvas for scrutiny officers.
-
-### 2. 🛡️ Enterprise Security & ClamAV Antivirus Quarantine
-- **Zero-Trust Document Pipeline**: All uploaded certificates enter an isolated `QUARANTINED` state.
-- **Live Antivirus Scanning**: Integrates ClamAV daemon to inspect uploaded files for malware, macros, and malicious payloads before safe-storage promotion.
-- **Tamper-Resistant SHA-256 Hashing**: Every document and statutory gazette is fingerprinted with cryptographic checksums for immutable provenance tracking.
-- **PII Masking & IDOR Protection**: Sensitive personal identity markers (Aadhaar, phone numbers) are masked (`******1902`) across UI and API layers. Strict tenancy isolation prevents unauthorized dossier access.
-
-### 3. ⚖️ Declarative Zero-Hardcoding Rule Engine
-- **No Hardcoded Conditionals**: Eligibility criteria reside dynamically in database tables (`SchemeRule`), never inside brittle Python `if/else` conditionals.
-- **Academic Year Versioning**: Multi-year schemes coexist without retroactive invalidation. Rules are versioned per academic year (`2024-25`, `2025-26`, `2026-27`).
-- **Cryptographic Source Provenance**: Every rule links directly to an authentic official publication (`SourceDocument`) with page-level statutory citations.
-
-### 4. 📲 Real-Time Indian Telecom SMS Notifications (Fast2SMS Gateway)
-- **Direct Citizen Alerts**: Application submission, status transitions, query requests, and OTP authentications dispatch real transactional SMS messages via Indian telecom routes (headers e.g., `57575711`).
-- **Truthful Delivery Status Tracking**: Decouples provider acceptance (`SENT_TO_PROVIDER`) from true carrier delivery (`DELIVERED`) to guarantee complete telemetry honesty.
-- **Asynchronous Task Queue**: Dispatches are executed off the HTTP critical path via Celery workers with automated retry policies.
-
-### 5. 🔍 District Scrutiny Desk & Officer Verification Workbench
-- **Priority Triage Queue**: Intelligent workload sorting based on statutory SLAs, pending deadlines, and flagged discrepancies.
-- **Interactive Verification Workbench**: Officers view high-resolution certificate scans side-by-side with OCR bounding boxes, allowing one-click decisions: *Accept Document Value*, *Keep Declared*, *Request Evidence*, or *Escalate*.
-- **Append-Only Immutable Audit Log**: Every administrative action, view, and status update writes to a cryptographically indexed, append-only ledger (`AuditLog`).
-
-### 6. ♿ GIGW 3.0 Compliance & Offline-First PWA
-- **Accessibility by Design**: Fully compliant with the Guidelines for Indian Government Websites (GIGW 3.0) and WCAG 2.1 AA standards. Includes high-contrast modes, text resizer, keyboard navigation, and screen reader ARIA landmarks.
-- **Bilingual Experience**: Instant switching between Hindi (हिंदी) and English.
-- **Offline Resilience**: Built with Vite + Workbox Progressive Web App service workers for reliable offline caching and low-bandwidth rural connectivity.
+The platform replaces fractured, paper-heavy, and opaque legacy scholarship workflows with an end-to-end digital pipeline that combines:
+1. **Sovereign Student Lifecycle Management** with One-Time Registration (OTR), multilingual access, and offline-ready PWA functionality.
+2. **Assistive Document Intelligence (AI OCR)** tuned for regional bilingual certificates (Hindi/Devanagari + English).
+3. **Deterministic Statutory Rule Engine** that evaluates complex government gazette policies without hardcoded software logic.
+4. **Human-in-the-Loop Scrutiny Workbench** empowering district welfare officers with side-by-side evidence inspection and fraud mitigation tools.
+5. **Real-Time Telecom SMS Telemetry** ensuring remote tribal students with basic mobile handsets receive immediate submission and verification updates.
 
 ---
 
-## 📐 Architecture & Technology Stack
+## 🎯 The Problem It Solves
 
-The system is engineered as a **Modular Monolith** to guarantee ACID transactional consistency, eliminate distributed microservice overhead, and maintain sovereign data integrity.
+Despite substantial financial commitments by the Government of India, tribal scholarship delivery historically suffers from severe structural bottlenecks:
 
 ```
-+---------------------------------------------------------------------------------------+
-|                                    TRIBAL SCHOLAR                                    |
-|                              (Modular Monolith Backend)                               |
-+---------------------------------------------------------------------------------------+
-|  +----------------+  +----------------+  +----------------+  +---------------------+  |
-|  |    accounts    |  |   applicants   |  |     schemes    |  |     documents       |  |
-|  | (RBAC & Auth)  |  | (Profiles/PII) |  | (Rules/RefSets)|  | (Provenance/Source) |  |
-|  +----------------+  +----------------+  +----------------+  +---------------------+  |
-|  +----------------+  +----------------+  +----------------+  +---------------------+  |
-|  |  applications  |  |    workflow    |  |  verification  |  |    notifications    |  |
-|  | (Lifecycle/App)|  | (State Engine) |  | (Human Review) |  | (Async Dispatch)    |  |
-|  +----------------+  +----------------+  +----------------+  +---------------------+  |
-|  +----------------+  +-------------------------------------------------------------+  |
-|  |     audit      |  |                        integrations                         |  |
-|  | (Append-Only)  |  | (Mock/Adapter Boundary: DigiLocker, PFMS, NSP, MoTA, Aadhaar)|  |
-|  +----------------+  +-------------------------------------------------------------+  |
-+---------------------------------------------------------------------------------------+
-        |                        |                             |
-+----------------+       +---------------+             +----------------+
-|   PostgreSQL   |       | Redis/Celery  |             |  Storage Layer |
-| (PostgreSQL 16)|       | (Worker 5.4)  |             | (MinIO / S3)   |
-+----------------+       +---------------+             +----------------+
+Traditional Scholarship Friction Points:
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│ High Dropout & Low  │    │  Bilingual Document │    │  Lengthy Scrutiny   │
+│  Digital Literacy   │───>│  Extraction Errors  │───>│    Bottlenecks      │
+│ (Remote V/VI Areas) │    │(Devanagari/English) │    │  (12-18 Mo Delays)  │
+└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+                                                                 │
+┌─────────────────────┐    ┌─────────────────────┐               │
+│ Delayed Fund Flow   │<───│  Opaque Rejections  │<──────────────┘
+│& Academic Hardship  │    │  & Zero Auditability│
+└─────────────────────┘    └─────────────────────┘
 ```
 
-### Technology Matrix
-
-| Layer | Technology | Function & Purpose |
-| :--- | :--- | :--- |
-| **Frontend PWA** | React 18, TypeScript, Vite, Tailwind CSS | High-performance responsive single page application, PWA Service Worker caching |
-| **Icons & UI** | Lucide React, Custom Tribal Motifs | GIGW compliant design system with sovereign Indian national aesthetics |
-| **Backend API** | Python 3.13, Django 5.1, Django REST Framework | Robust business logic, declarative serializers, and ORM transaction safety |
-| **Database** | PostgreSQL 16 | Relational data integrity, foreign key cascades, and JSONB rule configurations |
-| **Async Tasks & Broker** | Celery 5.4 + Redis 7.2 | Decoupled OCR processing, antivirus inspection, and SMS dispatching |
-| **Document Intelligence** | PaddleOCR 3.7 + Tesseract fallback | Dual-engine OCR with Devanagari script extraction and bounding box geometry |
-| **Malware Defense** | ClamAV Daemon | Real-time antivirus quarantine and file sanitization |
-| **SMS Gateway** | Fast2SMS Quick SMS API | Real Indian telecom SMS dispatching with carrier header routing |
-| **Web Server & WSGI** | Gunicorn 23.0 + WhiteNoise 6.8 | Production WSGI application server with optimized static caching |
-| **Cloud Infrastructure** | Railway PaaS | Continuous automated deployment with dedicated worker egress |
+1. **Geographical & Connectivity Barriers**: Tribal students residing in remote Scheduled Areas (under Article 244 of the Constitution) frequently encounter intermittent 2G/3G connectivity, causing application submission failures and lost data.
+2. **Linguistic & Certificate Challenges**: Caste, income, and domicile certificates in tribal districts (e.g., Jharkhand, Odisha, Madhya Pradesh, Chhattisgarh) are predominantly issued in regional Devanagari script or mixed bilingual formats that generic document scanners fail to parse.
+3. **Severe Verification Delays (12–18 Months)**: Welfare departments face mountains of unindexed PDF and paper submissions, resulting in massive verification backlogs, missed academic fee deadlines, and student dropouts.
+4. **Certificate Tampering & Fraud**: Lack of automated antivirus and malware quarantine permits malicious files, while lack of forensic cross-referencing allows forged income declarations or altered marksheets.
+5. **Arbitrary Rejections**: In legacy portals, students receive abrupt rejection notices without specific statutory citations or opportunities to submit clarifying evidence.
 
 ---
 
-## 📁 Repository Structure
+## 🌟 What Tribal Scholar Does: Key Capabilities
 
-```
-Tribel_Scholor/
-├── .railway/                     # Railway Infrastructure-as-Code definitions
-├── backend/                      # Django Modular Monolith Backend
-│   ├── apps/
-│   │   ├── accounts/             # RBAC, Authentication, Custom User model
-│   │   ├── applicants/           # Profile management, PII masking, caste validation
-│   │   ├── applications/         # Application lifecycle aggregate root
-│   │   ├── audit/                # Append-only tamper-resistant audit ledger
-│   │   ├── core/                 # Shared base models, validators, and exceptions
-│   │   ├── documents/            # Document vault, provenance tracking, SHA-256 checks
-│   │   ├── integrations/         # Government sandbox adapters (DigiLocker, PFMS, NSP)
-│   │   ├── notifications/        # Celery-driven notification engine & Fast2SMS provider
-│   │   ├── schemes/              # SchemeRule, SchemeVersion, Quota, ReferenceSets
-│   │   ├── verification/         # Officer scrutiny triage queue & demo services
-│   │   └── workflow/             # State machine engine & status transition history
-│   ├── tribel_scholar/           # Django settings, WSGI, ASGI, and root routing
-│   ├── tests/                    # 300+ integration, concurrency, and unit test suites
-│   ├── Dockerfile                # Production backend container definition
-│   ├── requirements.txt          # Python dependencies
-│   ├── start.sh                  # Railway container boot script (migrate + seed + run)
-│   └── manage.py                 # Django management interface
-├── frontend/                     # React + TypeScript + Vite PWA
-│   ├── public/                   # Static assets, web manifest, and national emblems
-│   ├── src/
-│   │   ├── components/           # UI components, GIGW accessibility toolbar, views
-│   │   │   ├── views/            # Portal Home, Dashboard, Officer Desk, Application Wizard
-│   │   │   └── common/           # Tribal motifs, headers, footers, badges
-│   │   ├── context/              # AuthContext, LanguageContext (English/Hindi)
-│   │   ├── services/             # Authoritative API client (`api.ts`)
-│   │   └── types/                # TypeScript interfaces and scheme schemas
-│   ├── Dockerfile                # Production multi-stage Nginx container
-│   ├── nginx.conf.template       # Production Nginx reverse proxy configuration
-│   └── vite.config.ts            # Vite build setup with Workbox PWA plugin
-├── docs/                         # 30+ Architectural blueprints and audit specifications
-│   ├── ARCHITECTURE.md           # Master architectural blueprint
-│   ├── LIVE_APPLICATION_QA_REPORT.md # Live production test verification audit
-│   ├── SCHEME_CONFIGURATION.md   # Declarative rule engine specification
-│   ├── RAILWAY_DEPLOYMENT.md     # Cloud provisioning and environment variables
-│   └── WORKFLOW_ENGINE.md        # State transition formal definition
-├── docker-compose.yml            # Local multi-service orchestration
-└── README.md                     # Project documentation & entry point
-```
+### 1. 🎓 For Tribal Students
+- **One-Time Registration (OTR)**: Students create a persistent sovereign profile once. Demographic, income, and community details are saved securely and reused across multiple schemes.
+- **Dynamic Scheme Discovery**: Based on the student's degree level (Undergraduate, Postgraduate, M.Phil., Ph.D., Overseas), annual family income, and chosen institution, the system instantly matches eligible schemes.
+- **Smart 5-Step Application Wizard**: Guided, step-by-step form completion with auto-saving, optimistic concurrency checks, and pre-submission validation.
+- **Zero-Trust Document Vault**: Upload certificates once. The vault displays real-time ClamAV antivirus clearance and AI OCR provisional extraction tags.
+- **Direct Telecom SMS Updates**: Every critical lifecycle event (submission, officer query, approval, fund transfer) triggers a direct SMS to the applicant's mobile phone.
+- **Bilingual & GIGW 3.0 Accessible**: Seamless one-click switching between **English** and **Hindi (हिंदी)**, with full screen reader support, keyboard navigation, and high-contrast color modes.
+- **Progressive Web App (PWA)**: Works smoothly on low-end smartphones and remains accessible during intermittent rural connectivity.
+
+### 2. 🛡️ For Scrutiny Officers & MoTA Administrators
+- **District Scrutiny Desk**: A unified administrative console that triages incoming applications by urgency, statutory SLA deadlines, and flagged discrepancies.
+- **Side-by-Side Verification Workbench**: Eliminates tab-switching. Officers review the uploaded physical certificate on an interactive canvas alongside the AI-extracted fields and student-declared data.
+- **Visual Bounding Box Overlays**: OCR-detected text regions are highlighted directly on the certificate image with confidence ratings.
+- **Material Conflict Alerting**: If an applicant declares an annual income of ₹2,50,000 but the tehsildar-issued certificate states ₹4,50,000, the system automatically flags a `MATERIAL_CONFLICT` for mandatory officer resolution.
+- **One-Click Determinations**: Officers can `Accept Extracted Value`, `Keep Declared Value`, `Request Clarifying Evidence`, or `Escalate`.
+- **Append-Only Tamper-Resistant Audit Trail**: Every viewing, decision, and status modification is permanently recorded with user identity, timestamp, and immutable state hashes.
+
+### 3. ⚖️ For Statutory Policy Governance
+- **Zero-Hardcoding Rule Engine**: Eligibility rules are stored as structured database entities linked to specific academic year versions (`SchemeVersion`), completely eliminating fragile hardcoded Python conditionals.
+- **Source-Document Provenance**: Every rule and institutional empanelment links directly to the authoritative Government of India Gazette notification with page citations and SHA-256 checksums.
 
 ---
 
-## 🚀 Quickstart & Local Development
+## 🏛️ Flagship MoTA Schemes Administered
 
-### Prerequisites
-- **Python**: 3.11+ (Python 3.12 or 3.13 recommended)
-- **Node.js**: 18.x or 20.x
-- **PostgreSQL**: 15+ (or Docker)
-- **Redis**: 7.x (or Docker)
+Tribal Scholar natively administers the statutory guidelines of the Ministry of Tribal Affairs' flagship programs:
 
-### 1. Backend Setup
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/KrishRaj-0821/tribal_scholar.git
-cd tribal_scholar
-
-# 2. Create and activate a virtual environment
-python -m venv .venv
-# On Windows:
-.venv\Scripts\activate
-# On Linux/macOS:
-# source .venv/bin/activate
-
-# 3. Install backend dependencies
-pip install -r backend/requirements.txt
-
-# 4. Configure local environment variables
-cp .env.example backend/.env
-# Edit backend/.env to set your local DB connection string (or use default SQLite for quick preview)
-
-# 5. Execute migrations
-python backend/manage.py migrate
-
-# 6. Seed statutory schemes and synthetic demo scenarios
-python backend/manage.py seed_schemes
-python backend/manage.py validate_schemes
-python backend/manage.py seed_demo_scenario
-
-# 7. Start the backend development server
-python backend/manage.py runserver 8000
+```
+                        ┌────────────────────────────────────────────────────────┐
+                        │      MINISTRY OF TRIBAL AFFAIRS SCHEME PORTFOLIO       │
+                        └────────────────────────────────────────────────────────┘
+                                    │                           │
+          ┌─────────────────────────┴──────────┐   ┌────────────┴────────────────────────┐
+          ▼                                    ▼   ▼                                     ▼
+   ┌───────────────┐                    ┌───────────────┐ ┌───────────────┐       ┌───────────────┐
+   │     NFST      │                    │   TOP_CLASS   │ │      NOS      │       │  PRE / POST   │
+   │  Fellowship   │                    │  Scholarship  │ │  Overseas ST  │       │  MATRIC ST    │
+   └───────────────┘                    └───────────────┘ └───────────────┘       └───────────────┘
+   • Regular M.Phil / Ph.D              • 260+ Premier    • World Top 500         • Secondary &
+   • JRF: ₹31,000/mo                    • IIT, IIM, AIIMS   Universities          • Higher Sec.
+   • SRF: ₹35,000/mo                    • Full Tuition    • Tuition + Allowance   • State DBT
+   • 750 Slots / Year                   • Living Expense  • 20 Slots / Year       • Inter-State
 ```
 
-### 2. Frontend Setup
-
-```bash
-# In a new terminal window:
-cd frontend
-
-# 1. Install dependencies
-npm install
-
-# 2. Start Vite development server
-npm run dev
-```
-
-The frontend will be accessible at `http://localhost:5173` and will automatically proxy API requests to `http://localhost:8000`.
-
-### 3. Optional: Background Celery Worker
-
-For async OCR and SMS task testing:
-
-```bash
-# In an activated virtual environment:
-celery -A tribel_scholar worker --loglevel=info
-```
-
-### 4. Docker Compose (Full Stack with one command)
-
-```bash
-docker-compose up --build
-```
+| Scheme Code | Scheme Name | Target Beneficiaries & Scope | Key Statutory Criteria |
+| :--- | :--- | :--- | :--- |
+| **NFST** | **National Fellowship for Higher Education of ST Students** | 750 annual fellowships for ST scholars pursuing full-time regular M.Phil. and Ph.D. degrees in Indian universities. | ST community certificate; admission in UGC-recognized university; JRF/SRF tenure guidelines. |
+| **TOP_CLASS** | **Top Class Education Scheme for ST Students** | Financial assistance covering full tuition fees and living stipends for meritorious ST students admitted to 260+ notified premier institutions (IITs, IIMs, NITs, AIIMS, NLUs, etc.). | ST certificate; annual family income $\le$ ₹6.0 Lakhs; admission in notified institution list. |
+| **NOS** | **National Overseas Scholarship for ST Candidates** | Prestigious overseas fellowship for ST scholars admitted to top QS/Times Higher Education ranked international universities for Master's and Ph.D. degrees. | ST certificate; annual family income $\le$ ₹6.0 Lakhs; minimum 55% marks in qualifying degree; QS ranking criteria. |
+| **PMS-ST** | **Post-Matric Scholarship for ST Students** | Centrally sponsored inter-state scheme covering post-matriculation studies with Direct Benefit Transfer (DBT) maintenance allowances. | ST community; annual family income $\le$ ₹2.50 Lakhs; recognized higher secondary/degree program. |
 
 ---
 
-## ☁️ Production Railway Deployment
+## 🤖 Responsible AI & Assistive Intelligence
 
-The repository includes ready-to-deploy configurations for **Railway**:
+Tribal Scholar implements strict **AI Safety and Ethical Governance** principles:
 
-1. **Backend Service**: Uses `Dockerfile.backend` (or `backend/Dockerfile`), starts via `/app/start.sh` which executes zero-downtime database migrations, statutory scheme validation, static asset collection, and Gunicorn initialization.
-2. **Frontend Service**: Uses `frontend/Dockerfile` with multi-stage Node build and Nginx runtime serving the optimized PWA bundle.
-3. **Managed Plugins**: Provision PostgreSQL and Redis directly from the Railway dashboard.
-4. **Environment Variables**: See [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY_DEPLOYMENT.md) for full variable mappings.
+```
+               Applicant Uploads Certificate
+                            │
+                            ▼
+              ┌───────────────────────────┐
+              │  ClamAV Antivirus Gateway │
+              └───────────────────────────┘
+                            │ (Safe)
+                            ▼
+              ┌───────────────────────────┐
+              │  Dual-Engine OCR Pipeline │
+              │ (PaddleOCR + Tesseract)   │
+              └───────────────────────────┘
+                            │
+               ┌────────────┴────────────┐
+               ▼                         ▼
+   Devanagari Text Parsing       Visual Bounding Boxes
+   (Income, Reg No, Authority)   (Mapped on Canvas)
+               │                         │
+               └────────────┬────────────┘
+                            │
+                            ▼
+              ┌───────────────────────────┐
+              │    AI Confidence Score    │
+              │  (Trust: OCR_PROVISIONAL) │
+              └───────────────────────────┘
+                            │
+                            ▼
+        ┌───────────────────────────────────────┐
+        │       HUMAN SCRUTINY WORKBENCH        │
+        │                                       │
+        │  [Accept]  [Keep Declared]  [Query]   │
+        │                                       │
+        │  * Officer Retains Sole Statutory *   │
+        │  *    Authority to Approve/Reject *   │
+        └───────────────────────────────────────┘
+```
+
+1. **AI is Strictly Assistive, Never Authoritative**: AI models perform optical character recognition, bounding box localization, and discrepancy scoring. **AI is never permitted to reject an applicant, disqualify a candidate, or approve disbursement.**
+2. **Dual-Engine Bilingual Support**: Integrates **PaddleOCR** paired with **Tesseract** fallbacks, trained specifically for Devanagari script certificates alongside standard English stamps and typography.
+3. **Confidence Scoring & Anomaly Detection**: Every extracted field carries a confidence percentage. Extractions with confidence below statutory thresholds automatically route into the officer review queue marked `NEEDS_HUMAN_SCRUTINY`.
+4. **Zero Pre-population Overwrite**: Extracted OCR data is flagged as `OCR_PROVISIONAL` and never blindly overwrites an applicant's sworn declaration without an officer's conscious validation.
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## 🛡️ Enterprise Security & Data Integrity
 
-The codebase contains a comprehensive test suite covering unit, integration, and security specifications:
+- **ClamAV Antivirus Quarantine**: Every uploaded document undergoes real-time antivirus scanning. Infected or corrupted files are immediately neutralized and rejected before entering storage.
+- **Cryptographic SHA-256 Checksums**: Every uploaded certificate and official scheme rulebook is hashed using SHA-256 to ensure complete non-repudiation and tamper prevention.
+- **Strict PII Masking**: In accordance with the Digital Personal Data Protection Act (DPDPA), Aadhaar numbers and mobile numbers are permanently masked (`******1902`) across all views, logs, and public API responses.
+- **In-Depth IDOR & Tenancy Protection**: Fine-grained authorization prevents horizontal privilege escalation. Students can only access their personal applications; officers can only review dossiers assigned to their jurisdiction.
+- **Telecom Key Isolation**: Third-party SMS API credentials and database connection secrets are encrypted in isolated server environments with zero client exposure.
 
-```bash
-# Run backend test suite
-pytest backend
+---
 
-# Run with coverage report
-pytest backend --cov=apps
+## 📱 Real-Time Indian Telecom SMS Pipeline
+
+To bridge the connectivity divide for tribal households that rely on basic feature phones, Tribal Scholar integrates directly with the **Fast2SMS Sovereign Telecom Gateway**:
+
+```
+[Application Lifecycle Event]
+         │
+         ▼
+[Celery Background Task] ──> [Fast2SMS Gateway] ──> [Indian Telecom Route (57575711)]
+         │                                                            │
+         ▼                                                            ▼
+[Database Audit Ledger]                                 [Applicant's Physical Phone]
+ (Status: SENT_TO_PROVIDER)                               "Your Tribal Scholar app
+                                                           MOTA/2025-26/NFST/9FA274
+                                                           submitted successfully."
 ```
 
-### Test Coverage Highlights:
-- **Statutory Rule Integrity**: Asserts that NFST, TOP_CLASS, and NOS rules match official gazette parameters without drift.
-- **Concurrency & Stress**: Verifies atomic lock protections during simultaneous application submissions.
-- **IDOR & Tenancy Isolation**: Verifies that students cannot access foreign dossiers or administrative verification workbenches.
-- **Malware Interception**: Confirms malicious file payloads are quarantined by the ClamAV gate.
-- **Live QA Audit**: See [docs/LIVE_APPLICATION_QA_REPORT.md](docs/LIVE_APPLICATION_QA_REPORT.md) for real browser automation and telecom test evidence.
+- **Truthful Telemetry**: The system strictly records provider dispatch (`SENT_TO_PROVIDER`) and does not falsify carrier handset delivery until genuine delivery receipts (DLR) are received.
+- **Non-Blocking Execution**: SMS dispatches are processed asynchronously by Celery workers, ensuring the student's browser experience remains instant and responsive.
+
+---
+
+## 🏛️ GIGW 3.0 Compliance & Accessibility
+
+Tribal Scholar adheres strictly to the **Guidelines for Indian Government Websites (GIGW 3.0)**:
+- **National Emblem & Typography**: Official Government of India national motifs, bilingual header branding, and accessible color contrast.
+- **Accessibility Toolbar**: Dedicated controls to increase/decrease text size, toggle high-contrast display modes, and activate text-to-speech screen reader support.
+- **Screen Reader Compatibility**: Semantic HTML5 landmarks, comprehensive ARIA attributes, and keyboard-only navigation paths.
+- **Sovereign Bilingualism**: Complete Hindi and English parity across all application workflows, alerts, and instructions.
+
+---
+
+## 🏗️ System Architecture at a Glance
+
+Tribal Scholar is constructed as a **Modular Monolith** to maximize reliability, maintain strict ACID transactional guarantees, and avoid the operational overhead of microservices:
+
+| Subsystem | Core Responsibilities |
+| :--- | :--- |
+| **`accounts`** | Role-Based Access Control (RBAC), secure authentication, session management. |
+| **`applicants`** | Sovereign profile management, community categorization, demographic records, PII masking. |
+| **`schemes`** | Declarative scheme catalog, academic year versions, eligibility rule engine, empanelled institution lists. |
+| **`documents`** | Document vault, ClamAV antivirus quarantine, SHA-256 content hashing, provenance registry. |
+| **`workflow`** | Deterministic state machine managing the application lifecycle (`DRAFT` $\rightarrow$ `SUBMITTED` $\rightarrow$ `UNDER_SCRUTINY` $\rightarrow$ `SANCTIONED`). |
+| **`verification`** | Priority triage queues, officer verification workbench, side-by-side evidence comparison. |
+| **`notifications`** | Event-driven async SMS engine powered by Celery, Redis, and Fast2SMS. |
+| **`audit`** | Append-only, tamper-resistant transaction ledger recording all administrative decisions. |
+| **`frontend (PWA)`** | React 18, TypeScript, Tailwind CSS, Workbox PWA service worker with offline caching. |
+
+---
+
+## 🧪 Live Evaluation Walkthrough
+
+Want to test the platform right now? Follow this 3-minute evaluation flow:
+
+1. **Open the Live Portal**: Navigate to [https://tribalscholar.up.railway.app](https://tribalscholar.up.railway.app).
+2. **Log In as Student**: Click **"Sign In"**, enter `demo_applicant` and `Tribal@2026` (or use the one-click persona button).
+   - Explore the **Sovereign Dashboard**, review the **Document Vault**, or initiate an application for **NFST** or **TOP_CLASS**.
+   - Notice the instant bilingual toggle (English $\leftrightarrow$ Hindi) and GIGW accessibility toolbar at the top.
+3. **Log In as Officer**: Sign out, then sign in with `demo_officer` and `Officer@2026`.
+   - Access the **District Scrutiny Desk** (`/officer`).
+   - Open a pending application to view the **Side-by-Side Verification Workbench**.
+   - Observe the uploaded certificate canvas with PaddleOCR bounding box highlights and material conflict warnings.
 
 ---
 
 ## 📜 Ten Principles of Sovereign Scheme Governance
 
-1. **Zero Hardcoded Eligibility**: Scheme rules reside entirely in database models (`SchemeRule`) and are never buried in procedural code.
+1. **Zero Hardcoded Eligibility**: All scheme rules live in database tables (`SchemeRule`), never inside application code.
 2. **Academic Year Versioning**: Schemes are versioned per academic year (`SchemeVersion`), preventing retroactive rule invalidation.
-3. **Strict Source Provenance**: Every rule points to an authentic gazette publication (`SourceDocument`) verified with SHA-256 checksums.
-4. **Assistive AI Boundary**: AI models assist with OCR and anomaly detection. **AI is never the final decision authority for eligibility, rejection, or selection.**
+3. **Strict Source Provenance**: Every rule points to an authentic gazette publication (`SourceDocument`) with verified SHA-256 checksums.
+4. **Assistive AI Boundary**: AI assists with OCR and anomaly detection. **AI is never the final decision authority for eligibility, rejection, or selection.**
 5. **Deterministic Rule Engine**: Binary eligibility conditions are evaluated deterministically with complete audit logs.
 6. **Mandatory Human-in-the-Loop**: Discrepancies or low-confidence extractions automatically route to officer scrutiny queues.
 7. **Append-Only Auditing**: `ApplicationStatusHistory` and `AuditLog` records are strictly immutable.
@@ -315,14 +272,14 @@ pytest backend --cov=apps
 
 ## 👥 Authors & Acknowledgments
 
-- **Team**: Smart India Hackathon (SIH) Finalists
-- **Agency**: Ministry of Tribal Affairs (MoTA), Government of India
-- **Problem Statement**: SIH PS 26239 — AI-Enabled Scholarship & Fellowship Management System
+- **Platform**: Tribal Scholar Management System
+- **Partner Agency**: Ministry of Tribal Affairs (MoTA), Government of India
+- **Problem Statement**: SIH Problem Statement 26239 — AI-Enabled Scholarship & Fellowship Management System
+- **Live Portal**: [https://tribalscholar.up.railway.app](https://tribalscholar.up.railway.app)
 - **Repository**: [https://github.com/KrishRaj-0821/tribal_scholar](https://github.com/KrishRaj-0821/tribal_scholar)
-- **Live Application**: [https://tribalscholar.up.railway.app](https://tribalscholar.up.railway.app)
 
 ---
 
 ## 📄 License
 
-This project is developed for the Smart India Hackathon in partnership with the Ministry of Tribal Affairs (MoTA). Released under the [MIT License](LICENSE).
+This project is developed for the Smart India Hackathon in partnership with the Ministry of Tribal Affairs (MoTA), Government of India. Released under the [MIT License](LICENSE).
