@@ -137,6 +137,13 @@ class DemoScenarioService:
                 )
             """, [DEMO_APPLICATION_NUMBER])
             cursor.execute("""
+                DELETE FROM notifications_smsnotification 
+                WHERE application_id IN (
+                    SELECT a.id FROM applications_application a 
+                    WHERE a.application_number = %s
+                )
+            """, [DEMO_APPLICATION_NUMBER])
+            cursor.execute("""
                 DELETE FROM applications_applicationfieldvalue 
                 WHERE application_id IN (
                     SELECT a.id FROM applications_application a 
@@ -164,7 +171,8 @@ class DemoScenarioService:
             applicant_user.role = UserRole.APPLICANT
         if not applicant_user.phone_number:
             applicant_user.phone_number = "9122671902"
-        applicant_user.set_password("Tribal@2026")
+        if not applicant_user.check_password("Tribal@2026"):
+            applicant_user.set_password("Tribal@2026")
         applicant_user.save()
 
         applicant_profile, _ = ApplicantProfile.objects.get_or_create(
@@ -193,7 +201,8 @@ class DemoScenarioService:
         )
         if officer_user.role != UserRole.SCRUTINY_OFFICER:
             officer_user.role = UserRole.SCRUTINY_OFFICER
-        officer_user.set_password("Officer@2026")
+        if not officer_user.check_password("Officer@2026"):
+            officer_user.set_password("Officer@2026")
         officer_user.is_staff = True
         officer_user.save()
 
