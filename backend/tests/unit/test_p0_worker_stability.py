@@ -99,10 +99,24 @@ class TestP0WorkerStability:
 
     def test_worker_memory_protection_settings(self):
         """
-        Verify that worker memory recycling settings are active to protect against gradual memory leaks.
+        Verify that worker memory recycling settings are configured for prefork recycling,
+        serving as supporting controls against memory leaks.
         """
         assert getattr(settings, 'CELERY_WORKER_MAX_TASKS_PER_CHILD', 0) > 0
         assert getattr(settings, 'CELERY_WORKER_MAX_MEMORY_PER_CHILD', 0) > 0
+
+    def test_worker_startup_concurrency_contracts(self):
+        """
+        Verify that start-worker.sh strictly enforces concurrency=1 for both scanner and ocr
+        roles to prevent memory multiplication under prefork.
+        """
+        script_path = os.path.join(settings.BASE_DIR, 'start-worker.sh')
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+
+        # Both scanner and ocr must use --concurrency=1 for memory safety
+        assert '--queues=ocr --concurrency=1' in script_content, "OCR worker must enforce concurrency=1"
+        assert '--queues=security_scan,notifications,default --concurrency=1' in script_content, "Scanner worker must enforce concurrency=1"
 
     def test_clamav_scanner_fails_closed_when_daemon_unreachable(self):
         """

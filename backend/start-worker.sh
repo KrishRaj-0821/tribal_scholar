@@ -73,7 +73,7 @@ if [ "$WORKER_ROLE" = "ocr" ]; then
     exec celery -A tribel_scholar worker --loglevel=info --queues=ocr --concurrency=1
 elif [ "$WORKER_ROLE" = "scanner" ]; then
     echo "==> Starting dedicated Malware Scanner Celery worker process (queues: security_scan,notifications,default)..."
-    exec celery -A tribel_scholar worker --loglevel=info --queues=security_scan,notifications,default --concurrency=2
+    exec celery -A tribel_scholar worker --loglevel=info --queues=security_scan,notifications,default --concurrency=1
 else
     echo "==> Starting unified Celery worker process (queues: default,security_scan,ocr,notifications)..."
     exec celery -A tribel_scholar worker --loglevel=info --queues=default,security_scan,ocr,notifications --concurrency=1
