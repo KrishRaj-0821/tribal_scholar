@@ -69,12 +69,12 @@ CLAM_EOF
 fi
 
 if [ "$WORKER_ROLE" = "ocr" ]; then
-    echo "==> Starting dedicated OCR Celery worker process (queues: ocr)..."
-    exec celery -A tribel_scholar worker --loglevel=info --queues=ocr --concurrency=1
+    echo "==> Starting dedicated OCR Celery worker process (queues: ocr, memory recycling: 850MB)..."
+    exec celery -A tribel_scholar worker --loglevel=info --queues=ocr --concurrency=1 --max-memory-per-child=850000
 elif [ "$WORKER_ROLE" = "scanner" ]; then
-    echo "==> Starting dedicated Malware Scanner Celery worker process (queues: security_scan,notifications,default)..."
-    exec celery -A tribel_scholar worker --loglevel=info --queues=security_scan,notifications,default --concurrency=1
+    echo "==> Starting dedicated Malware Scanner Celery worker process (queues: security_scan,notifications,default, memory recycling: 350MB)..."
+    exec celery -A tribel_scholar worker --loglevel=info --queues=security_scan,notifications,default --concurrency=1 --max-memory-per-child=350000
 else
     echo "==> Starting unified Celery worker process (queues: default,security_scan,ocr,notifications)..."
-    exec celery -A tribel_scholar worker --loglevel=info --queues=default,security_scan,ocr,notifications --concurrency=1
+    exec celery -A tribel_scholar worker --loglevel=info --queues=default,security_scan,ocr,notifications --concurrency=1 --max-memory-per-child=850000
 fi

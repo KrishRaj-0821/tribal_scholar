@@ -296,9 +296,19 @@ CELERY_TASK_ROUTES = {
     'apps.notifications.tasks.*': {'queue': 'notifications'},
 }
 
-# Worker Memory Protection & Process Recycling
+# Worker Process Recycling (Pre-fork child recycling)
+# IMPORTANT ARCHITECTURAL DISTINCTION:
+# max-memory-per-child is a post-task child-process recycling mechanism, NOT an in-flight OOM prevention mechanism.
+# The actual protection against container OOM is:
+# worker isolation + appropriate container memory allocation (1.5-2GB) + concurrency control + bounded document processing.
+#
+# A global CELERY_WORKER_MAX_MEMORY_PER_CHILD was removed because PaddleOCR normal working set (~508 MB)
+# exceeds the 350 MB scanner limit, which would cause harmful child recycling after every task.
+# Memory recycling limits are now configured role-specifically via CLI in start-worker.sh:
+# - Scanner worker: --max-memory-per-child=350000
+# - OCR worker:     --max-memory-per-child=850000
 CELERY_WORKER_MAX_TASKS_PER_CHILD = int(os.getenv('CELERY_MAX_TASKS_PER_CHILD', '50'))
-CELERY_WORKER_MAX_MEMORY_PER_CHILD = int(os.getenv('CELERY_MAX_MEMORY_PER_CHILD', '350000'))  # 350 MB in KB
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = None
 
 # ClamAV Configuration
 CLAMAV_HOST = os.getenv('CLAMAV_HOST', '127.0.0.1')

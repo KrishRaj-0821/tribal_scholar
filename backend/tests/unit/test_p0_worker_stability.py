@@ -99,24 +99,32 @@ class TestP0WorkerStability:
 
     def test_worker_memory_protection_settings(self):
         """
-        Verify that worker memory recycling settings are configured for prefork recycling,
-        serving as supporting controls against memory leaks.
+        Verify that task recycling is active as a secondary leak guard, and that the global
+        unsafe CELERY_WORKER_MAX_MEMORY_PER_CHILD is removed in favor of role-specific CLI limits.
         """
-        assert getattr(settings, 'CELERY_WORKER_MAX_TASKS_PER_CHILD', 0) > 0
-        assert getattr(settings, 'CELERY_WORKER_MAX_MEMORY_PER_CHILD', 0) > 0
+        assert getattr(settings, 'CELERY_WORKER_MAX_TASKS_PER_CHILD', 0) == 50
+        assert getattr(settings, 'CELERY_WORKER_MAX_MEMORY_PER_CHILD', None) is None
 
-    def test_worker_startup_concurrency_contracts(self):
+    def test_role_specific_worker_startup_contracts(self):
         """
-        Verify that start-worker.sh strictly enforces concurrency=1 for both scanner and ocr
-        roles to prevent memory multiplication under prefork.
+        Verify that start-worker.sh strictly enforces role-specific concurrency and memory limits:
+        - Scanner: concurrency=1, max-memory-per-child=350000
+        - OCR: concurrency=1, max-memory-per-child=850000 (well above ~508 MB model working set)
+        - Verifies OCR worker does NOT inherit the scanner's 350000 KiB threshold.
         """
         script_path = os.path.join(settings.BASE_DIR, 'start-worker.sh')
         with open(script_path, 'r', encoding='utf-8') as f:
             script_content = f.read()
 
-        # Both scanner and ocr must use --concurrency=1 for memory safety
-        assert '--queues=ocr --concurrency=1' in script_content, "OCR worker must enforce concurrency=1"
-        assert '--queues=security_scan,notifications,default --concurrency=1' in script_content, "Scanner worker must enforce concurrency=1"
+        # Scanner role contract
+        scanner_pattern = '--queues=security_scan,notifications,default --concurrency=1 --max-memory-per-child=350000'
+        assert scanner_pattern in script_content, "Scanner worker must enforce concurrency=1 and 350MB memory threshold"
+
+        # OCR role contract (must NOT use 350000 threshold)
+        ocr_pattern = '--queues=ocr --concurrency=1 --max-memory-per-child=850000'
+        assert ocr_pattern in script_content, "OCR worker must enforce concurrency=1 and 850MB memory threshold"
+        assert '--queues=ocr --concurrency=1 --max-memory-per-child=350000' not in script_content, \
+            "OCR worker must NOT inherit the scanner's 350000 KiB threshold"
 
     def test_clamav_scanner_fails_closed_when_daemon_unreachable(self):
         """
