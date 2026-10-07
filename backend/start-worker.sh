@@ -13,7 +13,14 @@ export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-WORKER_ROLE="${WORKER_ROLE:-all}"
+# Strict fail-closed validation: ClamAV and PaddleOCR must NEVER share a container failure domain
+if [ "$WORKER_ROLE" != "scanner" ] && [ "$WORKER_ROLE" != "ocr" ]; then
+    echo "FATAL [P0-1 Architecture Gate]: WORKER_ROLE must be strictly 'scanner' or 'ocr'." >&2
+    echo "Received invalid or missing WORKER_ROLE='${WORKER_ROLE}'." >&2
+    echo "Co-located or unassigned worker configurations are strictly forbidden to prevent ClamAV and PaddleOCR resource collision." >&2
+    exit 1
+fi
+
 echo "==> Worker operating mode: ${WORKER_ROLE}"
 
 # Wait for database & redis
@@ -42,16 +49,17 @@ print("ERROR: Worker dependencies timed out.")
 sys.exit(1)
 EOF
 
-CLAMAV_HOST="${CLAMAV_HOST:-127.0.0.1}"
 if [ "$WORKER_ROLE" = "ocr" ]; then
     echo "==> OCR Worker mode: ClamAV daemon disabled in this container to prevent memory contention."
-elif [ "$CLAMAV_HOST" != "127.0.0.1" ]; then
-    echo "==> Remote ClamAV host configured (${CLAMAV_HOST}:${CLAMAV_PORT:-3310}). Skipping local clamd startup."
-elif command -v clamd >/dev/null 2>&1; then
-    echo "==> Starting ClamAV daemon on 127.0.0.1:3310..."
-    clamd || echo "WARN: clamd failed to start."
-    sleep 2
-    python - << 'CLAM_EOF'
+elif [ "$WORKER_ROLE" = "scanner" ]; then
+    CLAMAV_HOST="${CLAMAV_HOST:-127.0.0.1}"
+    if [ "$CLAMAV_HOST" != "127.0.0.1" ]; then
+        echo "==> Remote ClamAV host configured (${CLAMAV_HOST}:${CLAMAV_PORT:-3310}). Skipping local clamd startup."
+    elif command -v clamd >/dev/null 2>&1; then
+        echo "==> Starting ClamAV daemon on 127.0.0.1:3310..."
+        clamd || echo "WARN: clamd failed to start."
+        sleep 2
+        python - << 'CLAM_EOF'
 import socket, time
 for _ in range(10):
     try:
@@ -66,6 +74,7 @@ for _ in range(10):
     except Exception:
         time.sleep(1)
 CLAM_EOF
+    fi
 fi
 
 if [ "$WORKER_ROLE" = "ocr" ]; then
@@ -75,6 +84,6 @@ elif [ "$WORKER_ROLE" = "scanner" ]; then
     echo "==> Starting dedicated Malware Scanner Celery worker process (queues: security_scan,notifications,default, memory recycling: 350MB)..."
     exec celery -A tribel_scholar worker --loglevel=info --queues=security_scan,notifications,default --concurrency=1 --max-memory-per-child=350000
 else
-    echo "==> Starting unified Celery worker process (queues: default,security_scan,ocr,notifications)..."
-    exec celery -A tribel_scholar worker --loglevel=info --queues=default,security_scan,ocr,notifications --concurrency=1 --max-memory-per-child=850000
+    echo "FATAL [P0-1 Architecture Gate]: Unsupported WORKER_ROLE='${WORKER_ROLE}'." >&2
+    exit 1
 fi

@@ -126,6 +126,69 @@ class TestP0WorkerStability:
         assert '--queues=ocr --concurrency=1 --max-memory-per-child=350000' not in script_content, \
             "OCR worker must NOT inherit the scanner's 350000 KiB threshold"
 
+        # Verify no combined/legacy fallback paths exist in the script
+        assert 'WORKER_ROLE="${WORKER_ROLE:-all}"' not in script_content, "start-worker.sh must not default to 'all'"
+        assert 'queues=default,security_scan,ocr,notifications' not in script_content, \
+            "start-worker.sh must not contain a combined queue fallback"
+
+    def test_worker_startup_fails_closed_on_invalid_or_missing_roles(self):
+        """
+        Verify that start-worker.sh fails closed with non-zero exit code when WORKER_ROLE
+        is unset, 'all', or unrecognized, preventing accidental co-location.
+        """
+        import shutil
+        import subprocess
+
+        sh_path = shutil.which('sh')
+        if not sh_path:
+            # Fallback check path if which doesn't resolve in venv
+            git_sh = r"C:\Program Files\Git\usr\bin\sh.exe"
+            if os.path.exists(git_sh):
+                sh_path = git_sh
+
+        if not sh_path:
+            pytest.skip("Shell binary (sh) not available for subprocess execution test")
+
+        script_path = os.path.join(settings.BASE_DIR, 'start-worker.sh')
+
+        # 1. Unset WORKER_ROLE
+        env_unset = os.environ.copy()
+        env_unset.pop('WORKER_ROLE', None)
+        proc_unset = subprocess.run([sh_path, script_path], env=env_unset, capture_output=True, text=True)
+        assert proc_unset.returncode != 0, "start-worker.sh must exit non-zero when WORKER_ROLE is unset"
+        assert "FATAL [P0-1 Architecture Gate]" in proc_unset.stderr
+
+        # 2. WORKER_ROLE=all
+        env_all = os.environ.copy()
+        env_all['WORKER_ROLE'] = 'all'
+        proc_all = subprocess.run([sh_path, script_path], env=env_all, capture_output=True, text=True)
+        assert proc_all.returncode != 0, "start-worker.sh must exit non-zero when WORKER_ROLE=all"
+        assert "FATAL [P0-1 Architecture Gate]" in proc_all.stderr
+
+        # 3. WORKER_ROLE=invalid
+        env_invalid = os.environ.copy()
+        env_invalid['WORKER_ROLE'] = 'invalid_role_xyz'
+        proc_invalid = subprocess.run([sh_path, script_path], env=env_invalid, capture_output=True, text=True)
+        assert proc_invalid.returncode != 0, "start-worker.sh must exit non-zero when WORKER_ROLE is invalid"
+        assert "FATAL [P0-1 Architecture Gate]" in proc_invalid.stderr
+
+    def test_railway_topology_defines_strictly_isolated_workers(self):
+        """
+        Verify that .railway/railway.ts defines worker-scanner and worker-ocr with strict role isolation,
+        and contains no combined worker or WORKER_ROLE=all.
+        """
+        railway_ts_path = os.path.join(settings.BASE_DIR, '..', '.railway', 'railway.ts')
+        if not os.path.exists(railway_ts_path):
+            railway_ts_path = os.path.join(settings.BASE_DIR, '.railway', 'railway.ts')
+
+        with open(railway_ts_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        assert 'WORKER_ROLE: "scanner"' in content, "worker-scanner must have WORKER_ROLE=scanner in Railway config"
+        assert 'WORKER_ROLE: "ocr"' in content, "worker-ocr must have WORKER_ROLE=ocr in Railway config"
+        assert 'WORKER_ROLE: "all"' not in content, "Railway config must NOT contain WORKER_ROLE=all"
+        assert 'service("worker",' not in content, "Railway config must NOT contain legacy combined worker"
+
     def test_clamav_scanner_fails_closed_when_daemon_unreachable(self):
         """
         Verify that when the ClamAV daemon is unreachable (e.g. socket refusal/timeout),
