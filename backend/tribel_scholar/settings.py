@@ -282,6 +282,24 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# Phase 1A: Isolated Task Queues & Deterministic Routing to Prevent ClamAV + OCR Memory Contention
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_QUEUES = {
+    'default': {},
+    'security_scan': {},
+    'ocr': {},
+    'notifications': {},
+}
+CELERY_TASK_ROUTES = {
+    'apps.documents.tasks.process_document_pipeline_task': {'queue': 'security_scan'},
+    'apps.documents.tasks.run_ocr_task': {'queue': 'ocr'},
+    'apps.notifications.tasks.*': {'queue': 'notifications'},
+}
+
+# Worker Memory Protection & Process Recycling
+CELERY_WORKER_MAX_TASKS_PER_CHILD = int(os.getenv('CELERY_MAX_TASKS_PER_CHILD', '50'))
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = int(os.getenv('CELERY_MAX_MEMORY_PER_CHILD', '350000'))  # 350 MB in KB
+
 # ClamAV Configuration
 CLAMAV_HOST = os.getenv('CLAMAV_HOST', '127.0.0.1')
 CLAMAV_PORT = int(os.getenv('CLAMAV_PORT', '3310'))

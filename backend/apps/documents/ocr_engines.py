@@ -8,6 +8,7 @@ import threading
 os.environ.setdefault('FLAGS_enable_pir_api', '0')
 os.environ.setdefault('FLAGS_use_mkldnn', '0')
 os.environ.setdefault('PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT', '0')
+os.environ.setdefault('PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK', 'True')
 os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
 os.environ.setdefault('OMP_NUM_THREADS', '1')
 os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
@@ -129,6 +130,7 @@ class PaddleOCREngine(BaseOCREngine):
                 os.environ['FLAGS_use_mkldnn'] = '0'
                 os.environ['PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT'] = '0'
                 os.environ['FLAGS_allocator_strategy'] = 'naive_best_fit'
+                os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 
                 import paddle
                 try:

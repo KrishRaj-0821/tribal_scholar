@@ -72,7 +72,7 @@ export default defineRailway(() => {
     },
   });
 
-  const worker = service("worker", {
+  const worker_scanner = service("worker-scanner", {
     source: tribal_scholar,
     build: {
       builder: "DOCKERFILE",
@@ -85,6 +85,7 @@ export default defineRailway(() => {
     },
     replicas: { "us-west2": 1 },
     env: {
+      WORKER_ROLE: "scanner",
       DATABASE_URL: Postgres.env.DATABASE_URL,
       DATABASE_ENGINE: "postgresql",
       DJANGO_DEBUG: "False",
@@ -112,7 +113,42 @@ export default defineRailway(() => {
     },
   });
 
+  const worker_ocr = service("worker-ocr", {
+    source: tribal_scholar,
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "Dockerfile.backend",
+    },
+    deploy: {
+      startCommand: "/app/start-worker.sh",
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 5,
+    },
+    replicas: { "us-west2": 1 },
+    env: {
+      WORKER_ROLE: "ocr",
+      DATABASE_URL: Postgres.env.DATABASE_URL,
+      DATABASE_ENGINE: "postgresql",
+      DJANGO_DEBUG: "False",
+      DJANGO_SECRET_KEY: preserve(),
+      REDIS_URL: Redis.env.REDIS_URL,
+      STORAGE_BACKEND: "s3",
+      AWS_S3_ENDPOINT_URL: "https://t3.storageapi.dev",
+      AWS_ACCESS_KEY_ID: preserve(),
+      AWS_SECRET_ACCESS_KEY: preserve(),
+      AWS_STORAGE_BUCKET_NAME: "tribal-scholar-docs-lzidsm",
+      AWS_S3_REGION_NAME: "sjc",
+      MALWARE_SCANNER_BACKEND: "clamav",
+      CLAMAV_HOST: "127.0.0.1",
+      CLAMAV_PORT: "3310",
+      FAST2SMS_API_KEY: preserve(),
+      FAST2SMS_API_URL: "https://www.fast2sms.com/dev/bulkV2",
+      FAST2SMS_ENABLED: "true",
+      FAST2SMS_ROUTE: "q",
+    },
+  });
+
   return project("tribal-scholar", {
-    resources: [frontend, backend, worker, Redis, Postgres, redisVolume, postgresVolume, docsBucket],
+    resources: [frontend, backend, worker_scanner, worker_ocr, Redis, Postgres, redisVolume, postgresVolume, docsBucket],
   });
 });

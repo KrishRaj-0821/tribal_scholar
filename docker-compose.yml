@@ -73,16 +73,39 @@ services:
       redis:
         condition: service_started
 
-  celery_worker:
+  celery_scanner:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: tribal_scholar_celery_worker
+    container_name: tribal_scholar_celery_scanner
     restart: unless-stopped
-    command: celery -A tribel_scholar worker --loglevel=info
+    command: /app/start-worker.sh
     volumes:
       - ./backend:/app
     environment:
+      - WORKER_ROLE=scanner
+      - DB_ENGINE=django.db.backends.postgresql
+      - POSTGRES_DB=${POSTGRES_DB:-tribal_scholar}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - backend
+      - redis
+
+  celery_ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: tribal_scholar_celery_ocr
+    restart: unless-stopped
+    command: /app/start-worker.sh
+    volumes:
+      - ./backend:/app
+    environment:
+      - WORKER_ROLE=ocr
       - DB_ENGINE=django.db.backends.postgresql
       - POSTGRES_DB=${POSTGRES_DB:-tribal_scholar}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}

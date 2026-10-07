@@ -9,6 +9,7 @@ ENV MKL_NUM_THREADS=1
 ENV FLAGS_enable_pir_api=0
 ENV FLAGS_use_mkldnn=0
 ENV PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=0
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 WORKDIR /app
 
@@ -31,12 +32,15 @@ RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav && \
     chmod 755 /var/run/clamav /var/lib/clamav /var/log/clamav && \
     echo "TCPSocket 3310" >> /etc/clamav/clamd.conf && \
     echo "TCPAddr 127.0.0.1" >> /etc/clamav/clamd.conf && \
-    echo "MaxThreads 4" >> /etc/clamav/clamd.conf && \
+    echo "MaxThreads 2" >> /etc/clamav/clamd.conf && \
     echo "Eicar-Test-Signature:0:*:45494341522d5354414e444152442d414e544956495255532d544553542d46494c45" > /var/lib/clamav/local.ndb && \
     chown clamav:clamav /var/lib/clamav/local.ndb
 
 COPY backend/requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-cache lightweight English & Hindi Devanagari PaddleOCR models at build time (eliminates runtime CDN downloads)
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(lang='en', device='cpu', enable_mkldnn=False, use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=False); PaddleOCR(lang='hi', ocr_version='PP-OCRv3', device='cpu', enable_mkldnn=False, use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=False)"
 
 COPY backend/ /app/
 RUN chmod +x /app/start.sh /app/start-worker.sh
