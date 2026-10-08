@@ -31,7 +31,8 @@ from apps.schemes.models import (
 )
 from apps.documents.models import (
     SourceDocument, SourceType, SourceDocumentStatus,
-    DocumentRequirement, DocumentValidityPolicy, ApplicantDocumentType, ApplicantDocument
+    DocumentRequirement, DocumentValidityPolicy, ApplicantDocumentType, ApplicantDocument,
+    DocumentLifecycleStatus
 )
 from apps.workflow.models import WorkflowDefinition, WorkflowState, ApplicationStatusHistory
 from apps.applications.models import (
@@ -127,6 +128,7 @@ def stress_env(db):
         document_type=ApplicantDocumentType.INCOME_CERTIFICATE,
         file_name="income_cert.pdf",
         checksum="3" * 64,
+        lifecycle_status=DocumentLifecycleStatus.SAFE,
         is_verified_by_officer=False
     )
 

@@ -43,6 +43,7 @@ credentials.json
 .vscode/
 .idea/
 .DS_Store
-Thumbs.db
 scratch/
+backend/storage/
+storage/
 
