@@ -76,6 +76,28 @@ def make_clean_pdf(title="Official Verification Document"):
     )
 
 
+def make_pdf_with_eicar_stream():
+    """Valid PDF with EICAR test signature embedded within an active object stream."""
+    stream_len = len(EICAR_BYTES)
+    return (
+        b"%PDF-1.4\n"
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n"
+        b"4 0 obj\n<< /Length " + str(stream_len).encode() + b" >>\nstream\n"
+        + EICAR_BYTES +
+        b"\nendstream\nendobj\n"
+        b"xref\n0 5\n"
+        b"0000000000 65535 f \n"
+        b"0000000010 00000 n \n"
+        b"0000000060 00000 n \n"
+        b"0000000120 00000 n \n"
+        b"0000000210 00000 n \n"
+        b"trailer\n<< /Size 5 /Root 1 0 R >>\n"
+        b"startxref\n320\n%%EOF\n"
+    )
+
+
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.requires_postgresql,
@@ -170,6 +192,7 @@ def infra_env(db):
 # ==============================================================================
 def test_1_real_redis_task_dispatch(infra_env, redis_client):
     """Prove real Redis receives and queues dispatched Celery tasks."""
+    redis_client.delete("security_scan")
     redis_client.delete("celery")
     doc_id = str(uuid.uuid4())
     corr_id = f"CORR-DISPATCH-{doc_id[:8]}"
@@ -177,14 +200,15 @@ def test_1_real_redis_task_dispatch(infra_env, redis_client):
     res = process_document_pipeline_task.delay(doc_id, correlation_id=corr_id)
     assert res.id is not None
 
-    queue_len = redis_client.llen("celery")
-    assert queue_len > 0, "Task was not pushed to real Redis 'celery' queue."
+    queue_len = redis_client.llen("security_scan") or redis_client.llen("celery")
+    assert queue_len > 0, "Task was not pushed to real Redis queue."
 
     # Inspect payload in Redis to confirm serialization
-    raw_item = redis_client.lindex("celery", 0)
+    raw_item = redis_client.lindex("security_scan", 0) or redis_client.lindex("celery", 0)
     data = json.loads(raw_item.decode("utf-8"))
     assert data["headers"]["task"] == "apps.documents.tasks.process_document_pipeline_task"
     assert doc_id in str(data)
+    redis_client.delete("security_scan")
     redis_client.delete("celery")
 
 
@@ -193,6 +217,7 @@ def test_1_real_redis_task_dispatch(infra_env, redis_client):
 # ==============================================================================
 def test_2_transaction_on_commit_dispatches_after_commit(infra_env, redis_client):
     """Prove no task is visible in Redis before DB commit, and is visible after commit."""
+    redis_client.delete("security_scan")
     redis_client.delete("celery")
     app = infra_env["app"]
     user = infra_env["user"]
@@ -207,10 +232,11 @@ def test_2_transaction_on_commit_dispatches_after_commit(infra_env, redis_client
             sync_process=False
         )
         # Inside transaction: must NOT be dispatched to Redis yet
-        assert redis_client.llen("celery") == 0, "Task was prematurely dispatched before DB commit!"
+        assert (redis_client.llen("security_scan") + redis_client.llen("celery")) == 0, "Task was prematurely dispatched before DB commit!"
 
     # Outside transaction: transaction.on_commit() has fired
-    assert redis_client.llen("celery") >= 1, "Task was not dispatched after DB commit."
+    assert (redis_client.llen("security_scan") + redis_client.llen("celery")) >= 1, "Task was not dispatched after DB commit."
+    redis_client.delete("security_scan")
     redis_client.delete("celery")
 
 
@@ -219,6 +245,7 @@ def test_2_transaction_on_commit_dispatches_after_commit(infra_env, redis_client
 # ==============================================================================
 def test_3_transaction_rollback_prevents_dispatch(infra_env, redis_client):
     """Prove rollback prevents task from ever reaching Redis."""
+    redis_client.delete("security_scan")
     redis_client.delete("celery")
     app = infra_env["app"]
     user = infra_env["user"]
@@ -238,7 +265,7 @@ def test_3_transaction_rollback_prevents_dispatch(infra_env, redis_client):
     except RuntimeError:
         pass
 
-    assert redis_client.llen("celery") == 0, "Task was dispatched despite transaction rollback!"
+    assert (redis_client.llen("security_scan") + redis_client.llen("celery")) == 0, "Task was dispatched despite transaction rollback!"
 
 
 # ==============================================================================
@@ -247,6 +274,7 @@ def test_3_transaction_rollback_prevents_dispatch(infra_env, redis_client):
 def test_4_real_celery_worker_consumes_task(infra_env, redis_client):
     """Run an actual Celery worker process against Redis and PostgreSQL."""
     import os
+    redis_client.delete("security_scan")
     redis_client.delete("celery")
     app = infra_env["app"]
     user = infra_env["user"]
@@ -266,11 +294,14 @@ def test_4_real_celery_worker_consumes_task(infra_env, redis_client):
     worker_env = os.environ.copy()
     worker_env["POSTGRES_DB"] = connection.settings_dict["NAME"]
     worker_env["TEST_LEVEL"] = "integration"
+    worker_env["PYTHONPATH"] = str(settings.BASE_DIR)
 
     worker_p = subprocess.Popen([
         sys.executable, "-m", "celery", "-A", "tribel_scholar",
-        "worker", "--pool=solo", "-l", "WARNING", "-n", f"worker_{uuid.uuid4().hex[:6]}@localhost"
-    ], env=worker_env)
+        "worker", "--pool=solo", "-l", "WARNING",
+        "-Q", "security_scan,ocr,default",
+        "-n", f"worker_{uuid.uuid4().hex[:6]}@localhost"
+    ], env=worker_env, cwd=str(settings.BASE_DIR))
 
     try:
         # Wait up to 50 seconds for worker to pick up task and transition document to SAFE
@@ -297,6 +328,7 @@ def test_4_real_celery_worker_consumes_task(infra_env, redis_client):
             worker_p.wait(timeout=5)
         except Exception:
             worker_p.kill()
+        redis_client.delete("security_scan")
         redis_client.delete("celery")
 
 
@@ -505,7 +537,7 @@ def test_10_real_clamav_eicar_detection(require_clamav, infra_env):
         application=app,
         actor_user=user,
         document_type=ApplicantDocumentType.INCOME_CERTIFICATE,
-        file_obj=SimpleUploadedFile("eicar.pdf", make_clean_pdf() + EICAR_BYTES, content_type="application/pdf"),
+        file_obj=SimpleUploadedFile("eicar.pdf", make_pdf_with_eicar_stream(), content_type="application/pdf"),
         sync_process=False
     )
 
@@ -601,7 +633,7 @@ def test_14_security_quarantine_retention_record_created(infra_env):
     """Infected document produces SecurityQuarantineRecord and preserves evidence."""
     app = infra_env["app"]
     user = infra_env["user"]
-    infected_payload = make_clean_pdf() + b"\n% __MOCK_INFECTED__\n"
+    infected_payload = make_pdf_with_eicar_stream()
 
     doc = DocumentIngestionService.upload_document(
         application=app,
@@ -617,7 +649,7 @@ def test_14_security_quarantine_retention_record_created(infra_env):
     assert record is not None
     assert record.deletion_status == QuarantineDeletionStatus.RETAINED
     assert record.retention_until > timezone.now()
-    assert "MockMalwareScanner" in record.scanner
+    assert record.scanner in ("MockMalwareScanner", "ClamAVScanner")
     assert record.deleted_at is None
 
     # Quarantine file remains intact for forensic retention

@@ -13,7 +13,7 @@ from apps.applicants.models import ApplicantProfile
 from apps.documents.models import (
     SourceDocument, SourceType, SourceDocumentStatus,
     DocumentRequirement, DocumentValidityPolicy, ApplicantDocumentType,
-    ApplicantDocument
+    ApplicantDocument, DocumentLifecycleStatus
 )
 from apps.schemes.models import (
     Scheme, SchemeType, SchemeVersion, SchemeVersionStatus,
@@ -162,10 +162,12 @@ def env(db):
 
     # Upload required document for app_a
     ApplicantDocument.objects.create(
+        application=app_a,
         applicant=user_a,
         document_type=ApplicantDocumentType.CASTE_CERTIFICATE,
         file_name="caste_certificate.pdf",
-        checksum="c" * 64
+        checksum="c" * 64,
+        lifecycle_status=DocumentLifecycleStatus.SAFE
     )
 
     # Populate valid field value for app_a

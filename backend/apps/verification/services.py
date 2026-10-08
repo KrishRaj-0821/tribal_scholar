@@ -70,6 +70,125 @@ class DocumentVerificationService:
             raise PermissionDenied("Only authorized officers/reviewers may perform verification actions.")
 
     @classmethod
+    def enqueue_document_for_verification(
+        cls,
+        document: ApplicantDocument,
+        correlation_id: Optional[str] = None
+    ) -> Optional[VerificationQueueItem]:
+        """
+        Authoritative handoff from OCR/Document ingestion to Officer Verification Queue.
+        Called when a document completes OCR extraction and provisional field persistence.
+        Decides if scrutiny is required:
+        - If document is linked to an application, ensures an active VerificationQueueItem exists.
+        - Captures evidence snapshot (extracted fields, confidence score, bounding boxes).
+        - Idempotent: Does not create duplicate PENDING/IN_REVIEW items for the same document and application.
+        - Emits AuditLog.
+        """
+        if not document:
+            return None
+
+        # Resolve application: document.application or applicant's active application
+        app = document.application
+        if not app and document.applicant:
+            from apps.applications.models import Application
+            app = Application.objects.filter(
+                applicant__user=document.applicant
+            ).order_by('-created_at').first()
+
+        if not app:
+            return None
+
+        # Check if an active queue item already exists for this document & application
+        existing = VerificationQueueItem.objects.filter(
+            application=app,
+            document=document,
+            status__in=[VerificationStatus.PENDING, VerificationStatus.IN_REVIEW]
+        ).first()
+        if existing:
+            return existing
+
+        # Check for open field conflicts on this application
+        from apps.applications.models import FieldConflict, ApplicationFieldValue
+        open_conflict = FieldConflict.objects.filter(
+            application=app,
+            status='OPEN'
+        ).first()
+
+        priority = VerificationPriority.HIGH if open_conflict else VerificationPriority.NORMAL
+        conflict_type = "MATERIAL_CONFLICT" if open_conflict else ""
+
+        # Build evidence snapshot from provisional extracted fields
+        prov_fields = ProvisionalExtractedField.objects.filter(document=document)
+        evidence_json = {}
+        for pf in prov_fields:
+            evidence_json[pf.field_code] = {
+                "ocr": pf.normalized_value or pf.raw_value,
+                "confidence": pf.confidence,
+                "page_number": pf.page_number,
+                "bounding_box": pf.bounding_box
+            }
+
+        # Check declared values to populate evidence comparison
+        declared_vals = ApplicationFieldValue.objects.filter(
+            application=app,
+            source='APPLICANT_DECLARED'
+        )
+        for dv in declared_vals:
+            fc = dv.field_definition.field_code if dv.field_definition else ""
+            if fc and fc in evidence_json:
+                evidence_json[fc]["declared"] = dv.value_json
+                if str(evidence_json[fc].get("ocr")) != str(dv.value_json):
+                    evidence_json[fc]["has_difference"] = True
+
+        conf_score = document.ocr_confidence_score if document.ocr_confidence_score is not None else 1.0
+
+        remarks = (
+            f"Statutory scrutiny required for {document.get_document_type_display() if hasattr(document, 'get_document_type_display') else document.document_type} "
+            f"('{document.file_name or document.original_filename}'). "
+            f"OCR extraction completed with {prov_fields.count()} provisional fields."
+        )
+
+        with transaction.atomic():
+            queue_item = VerificationQueueItem.objects.create(
+                application=app,
+                document=document,
+                item_type=VerificationItemType.DOCUMENT,
+                target_identifier=f"DOC_{document.document_type}_{document.id}",
+                priority=priority,
+                status=VerificationStatus.PENDING,
+                conflict_type=conflict_type,
+                confidence_score=conf_score,
+                officer_remarks=remarks,
+                current_evidence_json=evidence_json,
+                ai_assistance_json={
+                    "document_id": str(document.id),
+                    "document_type": document.document_type,
+                    "fields_extracted": prov_fields.count(),
+                    "ocr_confidence": conf_score
+                }
+            )
+
+            # Audit Trail
+            corr = correlation_id or f"ENQUEUE-{document.id}-{uuid.uuid4().hex[:6]}"
+            AuditLog.objects.create(
+                actor=None,
+                actor_role='SYSTEM',
+                entity_type='VerificationQueueItem',
+                entity_id=str(queue_item.id),
+                action=AuditAction.CREATE,
+                after_json={
+                    "queue_item_id": str(queue_item.id),
+                    "application_id": str(app.id),
+                    "document_id": str(document.id),
+                    "priority": priority,
+                    "correlation_id": corr
+                },
+                reason=remarks
+            )
+
+        return queue_item
+
+    @classmethod
     def assign_queue_item(
         cls,
         queue_item_id,

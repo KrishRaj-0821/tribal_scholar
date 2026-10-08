@@ -1,16 +1,21 @@
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
-    container_name: tribal_scholar_db
+    container_name: tribal_scholar_postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-tribal_scholar}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      default:
+        aliases:
+          - db
+          - postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
@@ -21,10 +26,18 @@ services:
     image: redis:7-alpine
     container_name: tribal_scholar_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # Redis is kept internal to the container network per security specification
+    expose:
+      - "6379"
     volumes:
       - redisdata:/data
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio:RELEASE.2024-05-10T01-41-38Z
@@ -39,6 +52,8 @@ services:
       - "9001:9001"
     volumes:
       - miniodata:/data
+    networks:
+      - default
 
   backend:
     build:
@@ -53,6 +68,7 @@ services:
              python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./backend:/app
+      - storage_data:/app/storage
     ports:
       - "8000:8000"
     environment:
@@ -60,62 +76,99 @@ services:
       - DB_ENGINE=django.db.backends.postgresql
       - POSTGRES_DB=${POSTGRES_DB:-tribal_scholar}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
-      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BACKEND=local
       - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY required}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY required}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
 
-  celery_scanner:
+  worker-scanner:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: tribal_scholar_celery_scanner
+    container_name: tribal_scholar_worker_scanner
     restart: unless-stopped
     command: /app/start-worker.sh
     volumes:
       - ./backend:/app
+      - storage_data:/app/storage
     environment:
       - WORKER_ROLE=scanner
       - DB_ENGINE=django.db.backends.postgresql
       - POSTGRES_DB=${POSTGRES_DB:-tribal_scholar}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
-      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BACKEND=local
+      - MALWARE_SCANNER_BACKEND=clamav
+      - CLAMAV_HOST=127.0.0.1
+      - CLAMAV_PORT=3310
     depends_on:
-      - backend
-      - redis
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s = socket.socket(); s.connect(('127.0.0.1', 3310)); s.sendall(b'zPING\\0'); resp = s.recv(1024); exit(0 if b'PONG' in resp else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
-  celery_ocr:
+  worker-ocr:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: tribal_scholar_celery_ocr
+    container_name: tribal_scholar_worker_ocr
     restart: unless-stopped
     command: /app/start-worker.sh
     volumes:
       - ./backend:/app
+      - storage_data:/app/storage
     environment:
       - WORKER_ROLE=ocr
       - DB_ENGINE=django.db.backends.postgresql
       - POSTGRES_DB=${POSTGRES_DB:-tribal_scholar}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
-      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BACKEND=local
+      - OCR_ENGINE_BACKEND=paddleocr
     depends_on:
-      - backend
-      - redis
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"from paddleocr import PaddleOCR; exit(0)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   frontend:
     build:
@@ -129,9 +182,17 @@ services:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - default
 
 volumes:
   pgdata:
   redisdata:
   miniodata:
+  storage_data:
+
+networks:
+  default:
+    name: tribal_scholar_net

@@ -456,6 +456,26 @@ class SubmissionService:
             except Exception as notif_err:
                 logger.warning("Failed to queue submission SMS for application %s: %s", app.id, notif_err)
 
+            # 9.6. Ensure verification queue items exist for all application documents
+            try:
+                from apps.verification.services import DocumentVerificationService
+                for s_doc in app.documents.all():
+                    DocumentVerificationService.enqueue_document_for_verification(s_doc)
+            except Exception as v_err:
+                logger.error("Failed to auto-enqueue documents for application %s: %s", app.id, v_err)
+                try:
+                    AuditLog.objects.create(
+                        actor=actor_user,
+                        actor_role=getattr(actor_user, 'role', 'APPLICANT'),
+                        entity_type='Application',
+                        entity_id=str(app.id),
+                        action=AuditAction.VALIDATE,
+                        after_json={'error': str(v_err), 'auto_enqueue_failed': True},
+                        reason=f"Application submitted, but auto-enqueuing documents for verification queue encountered an error: {v_err}"
+                    )
+                except Exception as audit_err:
+                    logger.error(f"Failed to record audit log for auto-enqueue failure on application {app.id}: {audit_err}")
+
             # 10. Generate Submission Receipt
             receipt = {
                 "status": "SUBMITTED",

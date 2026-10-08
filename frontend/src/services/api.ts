@@ -352,6 +352,22 @@ export const applicationApi = {
       message: string;
     }>(`/api/v1/applications/${applicationId}/readiness/`);
   },
+
+  getStatusTimeline: async (applicationId: string) => {
+    return await fetchApi<{
+      application_id: string;
+      application_number: string;
+      current_state: string;
+      is_verified: boolean;
+      events: Array<{
+        step: number;
+        title: string;
+        timestamp: string | null;
+        status: string;
+        details: string;
+      }>;
+    }>(`/api/v1/applications/${applicationId}/status-timeline/`);
+  },
 };
 
 // ----------------------------------------------------------------------
@@ -385,11 +401,38 @@ export const officerApi = {
     return await fetchApi<any>(`/api/v1/verification/queue/${id}/`);
   },
 
-  resolveConflict: async (queueItemId: string, decision: string, reason?: string) => {
+  resolveConflict: async (queueItemId: string, decision: string, reason?: string, chosenValue?: any) => {
     return await fetchApi<any>(`/api/v1/verification/conflicts/${queueItemId}/resolve/`, {
       method: 'POST',
-      body: JSON.stringify({ decision, reason: reason || 'Resolved following officer scrutiny.' }),
+      body: JSON.stringify({ 
+        decision_action: decision, 
+        chosen_value: chosenValue,
+        reason: reason || 'Resolved following officer scrutiny.' 
+      }),
     });
+  },
+
+  getOcrFields: async (documentId: string) => {
+    return await fetchApi<any>(`/api/v1/verification/documents/${documentId}/ocr-fields/`);
+  },
+
+  getDocumentEvidence: async (documentId: string) => {
+    return await fetchApi<any>(`/api/v1/verification/documents/${documentId}/evidence/`);
+  },
+
+  verifyField: async (documentId: string, payload: {
+    field_code: string;
+    verified_value: any;
+    reason?: string;
+  }) => {
+    return await fetchApi<any>(`/api/v1/verification/documents/${documentId}/verify-field/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getHistory: async (documentId: string) => {
+    return await fetchApi<any>(`/api/v1/verification/documents/${documentId}/history/`);
   },
 
   verifyDocument: async (documentId: string, payload: {

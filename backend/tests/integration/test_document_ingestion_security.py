@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.db import transaction, connections
+from django.test import override_settings
 from rest_framework.test import APIClient
 from rest_framework import status
 from PIL import Image
@@ -403,6 +404,7 @@ def test_12_duplicate_document_is_flagged_not_called_fraud(doc_env):
     assert "DUPLICATE_DOCUMENT_CANDIDATE" in audit.reason
 
 
+@override_settings(MALWARE_SCANNER_BACKEND="mock")
 def test_13_infected_mock_scan_rejects_document(doc_env):
     """13. Infected mock scan rejects document."""
     app = doc_env["app_a"]
@@ -423,6 +425,7 @@ def test_13_infected_mock_scan_rejects_document(doc_env):
     assert "MALWARE_DETECTED" in doc.rejection_reason
 
 
+@override_settings(MALWARE_SCANNER_BACKEND="mock")
 def test_14_scanner_error_does_not_mark_safe(doc_env):
     """14. Scanner error does not mark SAFE (becomes QUARANTINED)."""
     app = doc_env["app_a"]
@@ -462,6 +465,7 @@ def test_15_safe_document_promoted_from_quarantine(doc_env):
     assert get_object_storage().exists(doc.storage_key) is True
 
 
+@override_settings(MALWARE_SCANNER_BACKEND="mock")
 def test_16_unsafe_document_never_enters_ocr_queue(doc_env):
     """16. Unsafe document never enters OCR queue."""
     app = doc_env["app_a"]
@@ -760,6 +764,7 @@ def test_28_rate_limiting_works(doc_env, settings):
     assert resp_throttled.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
 
+@override_settings(MALWARE_SCANNER_BACKEND="mock")
 def test_29_processing_retry_backoff_works(doc_env):
     """29. Processing retry/backoff works."""
     app = doc_env["app_a"]

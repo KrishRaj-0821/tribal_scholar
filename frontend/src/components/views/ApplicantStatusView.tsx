@@ -13,10 +13,11 @@ import {
 export const ApplicantStatusView: React.FC = () => {
   const { language } = useLanguage();
   const navigate = useNavigate();
-  const { applicant, verification } = useDemo();
+  const { applicant } = useDemo();
   const { id } = useParams<{ id: string }>();
 
   const [realApp, setRealApp] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any>(null);
   const [loadingApp, setLoadingApp] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<SMSNotificationRecord[]>([]);
   const [loadingSMS, setLoadingSMS] = useState<boolean>(false);
@@ -40,8 +41,12 @@ export const ApplicantStatusView: React.FC = () => {
       setLoadingApp(true);
       applicationApi.get(id)
         .then((data) => setRealApp(data))
-        .catch((err) => console.warn('Real application fetch fallback to dossier:', err))
+        .catch((err) => console.warn('Real application fetch error:', err))
         .finally(() => setLoadingApp(false));
+
+      applicationApi.getStatusTimeline(id)
+        .then((data) => setTimeline(data))
+        .catch((err) => console.warn('Real timeline fetch error:', err));
     }
   }, [id]);
 
@@ -59,7 +64,7 @@ export const ApplicantStatusView: React.FC = () => {
     }
   };
 
-  const isVerified = verification.status === 'VERIFIED' || realApp?.current_state_code === 'VERIFIED';
+  const isVerified = timeline?.is_verified || realApp?.current_state_code === 'VERIFIED';
   const displayAppId = realApp?.application_number || realApp?.id || applicant.applicationId;
   const displayScheme = realApp?.scheme_code ? `MoTA Scheme (${realApp.scheme_code})` : 'Top Class Education for ST Students (TOP-05)';
   const displayState = realApp?.current_state_code || (isVerified ? 'VERIFIED' : 'UNDER_SCRUTINY');
@@ -136,14 +141,14 @@ export const ApplicantStatusView: React.FC = () => {
             {isVerified ? <CheckCircle className="w-4 h-4 text-[#198754]" /> : <Clock className="w-4 h-4 text-[#C85A17]" />}
             <span>
               {isVerified 
-                ? 'Authoritative Evidence Verified: Income Certified at ₹4,50,000' 
-                : 'Scrutiny Required: Material Discrepancy between Declaration and Document'}
+                ? 'Authoritative Evidence Verified: Application State Promoted to VERIFIED' 
+                : 'Scrutiny Pending: Application Under Statutory Review'}
             </span>
           </div>
           <p className="leading-relaxed text-[11px]">
             {isVerified 
-              ? 'District Scrutiny Officer Shri S. K. Mahapatra has reviewed the uploaded revenue income certificate and promoted the authoritative value to ₹4,50,000 (OFFICER_VERIFIED, Rank 60). The Scheme Rule Engine has reevaluated statutory income conditions to PASS.'
-              : 'The candidate declared an annual family income of ₹5,00,000, while the revenue income certificate indicates ₹4,50,000. Under statutory rules, machine OCR cannot overwrite declared data. An authorized scrutiny officer is currently examining the physical evidence.'}
+              ? `Application ${displayAppId} has been verified by the authorized scrutiny authority. Statutory rules evaluated successfully against authentic database evidence.`
+              : `Application ${displayAppId} is currently undergoing automated validation and officer scrutiny. Evidence documents are securely stored in the system.`}
           </p>
         </div>
       </div>
@@ -156,61 +161,30 @@ export const ApplicantStatusView: React.FC = () => {
         </h3>
 
         <div className="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#CFD8DC]">
-          {/* Step 1 */}
-          <div className="relative text-xs">
-            <div className="absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full bg-[#198754] border-2 border-white shadow-xs"></div>
-            <div className="font-bold text-[#150202]">1. Application Created & Demographics Seeded</div>
-            <div className="text-[11px] text-[#546E7A]">12-Sep-2026 09:12:00 UTC • Candidate completed OTR registration and form submission.</div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="relative text-xs">
-            <div className="absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full bg-[#198754] border-2 border-white shadow-xs"></div>
-            <div className="font-bold text-[#150202]">2. Revenue Income Certificate Uploaded</div>
-            <div className="text-[11px] text-[#546E7A]">12-Sep-2026 09:14:00 UTC • File <code>income_cert_mandla_2026.png</code> (248 KB) ingested into isolated buffer.</div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="relative text-xs">
-            <div className="absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full bg-[#198754] border-2 border-white shadow-xs"></div>
-            <div className="font-bold text-[#150202]">3. Security & Anti-Malware Gate Completed</div>
-            <div className="text-[11px] text-[#546E7A]">12-Sep-2026 09:14:15 UTC • ClamAV daemon verified file clean (Zero signature match). Status: <strong>SAFE</strong>.</div>
-          </div>
-
-          {/* Step 4 */}
-          <div className="relative text-xs">
-            <div className="absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full bg-[#198754] border-2 border-white shadow-xs"></div>
-            <div className="font-bold text-[#150202]">4. Multi-Lingual OCR Provisional Extraction Completed</div>
-            <div className="text-[11px] text-[#546E7A]">12-Sep-2026 09:14:35 UTC • PaddleOCR 3.7.0 extracted Certificate No: <strong>TEST-2026-001</strong> and Income: <strong>₹4,50,000</strong>.</div>
-          </div>
-
-          {/* Step 5 */}
-          <div className="relative text-xs">
-            <div className={`absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs ${
-              isVerified ? 'bg-[#198754]' : 'bg-[#FFC107]'
-            }`}></div>
-            <div className="font-bold text-[#150202]">
-              5. Officer Scrutiny & Conflict Resolution {isVerified ? '(COMPLETED)' : '(IN PROGRESS)'}
+          {timeline?.events && timeline.events.length > 0 ? (
+            timeline.events.map((evt: any, idx: number) => {
+              const isCompleted = evt.status === 'COMPLETED';
+              const isInProgress = evt.status === 'IN_PROGRESS';
+              return (
+                <div key={idx} className="relative text-xs">
+                  <div className={`absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs ${
+                    isCompleted ? 'bg-[#198754]' : (isInProgress ? 'bg-[#FFC107]' : 'bg-gray-400')
+                  }`}></div>
+                  <div className="font-bold text-[#150202]">
+                    {evt.step}. {evt.title}
+                  </div>
+                  <div className="text-[11px] text-[#546E7A]">
+                    {evt.timestamp ? new Date(evt.timestamp).toLocaleString('en-IN', { timeZone: 'UTC' }) + ' UTC • ' : ''}
+                    {evt.details}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-xs text-[#546E7A] italic py-2">
+              Loading authentic application lifecycle timeline from PostgreSQL...
             </div>
-            <div className="text-[11px] text-[#546E7A]">
-              {isVerified 
-                ? `13-Sep-2026 • Verified by ${verification.officer} (${verification.role}). Value promoted to OFFICER_VERIFIED (Rank 60).` 
-                : 'Pending • Case in District Verification Queue. Awaiting officer confirmation.'}
-            </div>
-          </div>
-
-          {/* Step 6 */}
-          <div className="relative text-xs">
-            <div className={`absolute -left-[23px] top-0 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs ${
-              isVerified ? 'bg-[#198754]' : 'bg-gray-400'
-            }`}></div>
-            <div className="font-bold text-[#150202]">6. Deterministic Scheme Eligibility Reevaluated</div>
-            <div className="text-[11px] text-[#546E7A]">
-              {isVerified 
-                ? 'Income Rule evaluated to PASS (₹4,50,000 <= ₹6,00,000 ceiling). Community Rule: PASS.' 
-                : 'Awaiting authoritative evidence before final rule clearance.'}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

@@ -66,21 +66,22 @@ export const ApplicationWizardView: React.FC<ApplicationWizardViewProps> = ({
   const [vaultDocuments, setVaultDocuments] = useState<VaultDocument[]>([]);
   const [usedVaultSources, setUsedVaultSources] = useState<Record<string, string>>({});
 
-  // Form Fields
-  const [fullName, setFullName] = useState(user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Rajeshwar Soren');
-  const [fatherName, setFatherName] = useState('Shri Rameshwar Soren');
-  const [stateName, setStateName] = useState('Jharkhand');
-  const [districtName, setDistrictName] = useState('Ranchi');
+  // Form Fields - strictly derived from authenticated user context, never hardcoded fake values
+  const userFullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || '' : '';
+  const [fullName, setFullName] = useState(userFullName);
+  const [fatherName, setFatherName] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [districtName, setDistrictName] = useState('');
   const [community, setCommunity] = useState('ST');
   const [casteCertNo, setCasteCertNo] = useState('');
-  const [institutionName, setInstitutionName] = useState('Indian Institute of Technology Bombay');
-  const [aisheCode, setAisheCode] = useState('IIT-BOM');
-  const [courseName, setCourseName] = useState('B.Tech Computer Science');
+  const [institutionName, setInstitutionName] = useState('');
+  const [aisheCode, setAisheCode] = useState('');
+  const [courseName, setCourseName] = useState('');
   const [admissionYear, setAdmissionYear] = useState('2026');
-  const [annualIncome, setAnnualIncome] = useState<string>('500000');
+  const [annualIncome, setAnnualIncome] = useState<string>('');
   const [incomeCertNo, setIncomeCertNo] = useState('');
   const [studyDestination, setStudyDestination] = useState<string>('ABROAD');
-  const [foreignUniversity, setForeignUniversity] = useState<string>('University of Oxford');
+  const [foreignUniversity, setForeignUniversity] = useState<string>('');
 
   const isOverseasScheme = selectedScheme.code.toUpperCase().includes('NOS') || selectedScheme.code.toUpperCase().includes('OVERSEAS');
 

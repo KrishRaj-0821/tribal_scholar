@@ -501,103 +501,105 @@ class DocumentVaultView(APIView):
             return Response({"error": "File is empty."}, status=status.HTTP_400_BAD_REQUEST)
 
         import hashlib, uuid
+        from django.db import transaction
+        from django.utils import timezone
+        from .security import FileContentDetector
+        from .models import (
+            DocumentLifecycleStatus,
+            MalwareScanStatus,
+            ContentValidationStatus,
+            DocumentVersion,
+            DocumentProcessingJob,
+            DocumentJobType,
+            DocumentJobStatus
+        )
+        from .tasks import process_document_pipeline_task
+        from .services import DocumentIngestionService
+
+        max_size_bytes = getattr(settings, 'MAX_UPLOAD_SIZE_MB', 10) * 1024 * 1024
+        if len(raw_content) > max_size_bytes:
+            return Response(
+                {"error": f"File size exceeds maximum permitted limit of {max_size_bytes} bytes."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        detected_prelim_mime = FileContentDetector.detect_mime(raw_content)
+        if detected_prelim_mime in (
+            "application/x-dosexec",
+            "application/x-executable",
+            "application/x-mach-binary",
+            "application/zip",
+            "text/html",
+            "application/javascript"
+        ):
+            return Response(
+                {"error": f"Executable or dangerous binary detected ({detected_prelim_mime}). Upload rejected by security boundary."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         sha256 = hashlib.sha256(raw_content).hexdigest()
         original_name = getattr(file_obj, 'name', f"{document_type}.pdf")
         detected_mime = getattr(file_obj, 'content_type', '') or 'application/pdf'
 
         doc_id = uuid.uuid4()
         storage = get_object_storage()
-        safe_key = storage.put_safe(str(doc_id), raw_content, original_name)
+        quarantine_key = storage.put_quarantine(str(doc_id), raw_content, original_name)
 
-        doc = ApplicantDocument.objects.create(
-            id=doc_id,
-            applicant=user,
-            document_type=document_type,
-            file_name=original_name,
-            original_filename=original_name,
-            storage_key=safe_key,
-            declared_mime_type=detected_mime,
-            detected_mime_type=detected_mime,
-            file_size_bytes=len(raw_content),
-            sha256=sha256,
-            lifecycle_status='SAFE',
-            malware_scan_status='CLEAN',
-            content_validation_status='VALID',
-            uploaded_by=user,
-            metadata_json={"vault_uploaded": True}
-        )
-
-        from .models import ProvisionalExtractedField
-        if document_type == 'INCOME_CERTIFICATE':
-            income_val = request.data.get('declared_income') or "450000"
-            cert_no = request.data.get('certificate_number') or f"INC/JH/{str(uuid.uuid4().hex[:6]).upper()}/2025"
-            ProvisionalExtractedField.objects.create(
-                document=doc,
-                field_code='annual_family_income',
-                field_label='Annual Family Income',
-                raw_value=str(income_val),
-                normalized_value=int(income_val) if str(income_val).isdigit() else 450000,
-                confidence=0.96,
-                trust_level='OCR_PROVISIONAL'
-            )
-            ProvisionalExtractedField.objects.create(
-                document=doc,
-                field_code='income_certificate_number',
-                field_label='Income Certificate Number',
-                raw_value=cert_no,
-                normalized_value=cert_no,
-                confidence=0.98,
-                trust_level='OCR_PROVISIONAL'
-            )
-            ProvisionalExtractedField.objects.create(
-                document=doc,
-                field_code='issuing_authority',
-                field_label='Issuing Authority',
-                raw_value='Sub-Divisional Officer (SDO)',
-                normalized_value='Sub-Divisional Officer (SDO)',
-                confidence=0.94,
-                trust_level='OCR_PROVISIONAL'
-            )
-        elif document_type == 'CASTE_CERTIFICATE':
-            cert_no = request.data.get('certificate_number') or f"JH/ST/{str(uuid.uuid4().hex[:6]).upper()}/2024"
-            ProvisionalExtractedField.objects.create(
-                document=doc,
-                field_code='caste_certificate_number',
-                field_label='ST Community Certificate Number',
-                raw_value=cert_no,
-                normalized_value=cert_no,
-                confidence=0.98,
-                trust_level='OCR_PROVISIONAL'
-            )
-            ProvisionalExtractedField.objects.create(
-                document=doc,
-                field_code='community',
-                field_label='Community Category',
-                raw_value='ST',
-                normalized_value='ST',
-                confidence=0.99,
-                trust_level='OCR_PROVISIONAL'
-            )
-        elif document_type == 'ACADEMIC_TRANSCRIPT':
-            ProvisionalExtractedField.objects.create(
-                document=doc,
-                field_code='qualification_marks_percentage',
-                field_label='Qualifying Exam Percentage',
-                raw_value='86.5',
-                normalized_value=86.5,
-                confidence=0.95,
-                trust_level='OCR_PROVISIONAL'
+        with transaction.atomic():
+            doc = ApplicantDocument.objects.create(
+                id=doc_id,
+                applicant=user,
+                document_type=document_type,
+                file_name=original_name,
+                original_filename=original_name,
+                storage_key=quarantine_key,
+                declared_mime_type=detected_mime,
+                detected_mime_type=detected_prelim_mime,
+                file_size_bytes=len(raw_content),
+                sha256=sha256,
+                checksum=sha256,
+                lifecycle_status=DocumentLifecycleStatus.QUARANTINED,
+                malware_scan_status=MalwareScanStatus.NOT_SCANNED,
+                content_validation_status=ContentValidationStatus.PENDING,
+                uploaded_by=user,
+                metadata_json={"vault_uploaded": True}
             )
 
-        AuditLog.objects.create(
-            actor=user,
-            actor_role=getattr(user, 'role', 'APPLICANT'),
-            entity_type='ApplicantDocument',
-            entity_id=str(doc.id),
-            action=AuditAction.DOCUMENT_UPLOADED,
-            after_json={'document_type': document_type, 'vault': True},
-            reason="Applicant added document to secure vault."
-        )
+            DocumentVersion.objects.create(
+                document=doc,
+                version_number=1,
+                storage_key=quarantine_key,
+                sha256=sha256,
+                file_size_bytes=len(raw_content),
+                uploaded_at=timezone.now(),
+                uploaded_by=user,
+                lifecycle_status=DocumentLifecycleStatus.QUARANTINED,
+                reason="Vault initial upload"
+            )
+
+            correlation_id = f"DOC-VAULT-{doc.id}-{uuid.uuid4().hex[:8]}"
+            DocumentProcessingJob.objects.create(
+                document=doc,
+                job_type=DocumentJobType.SECURITY_SCAN,
+                status=DocumentJobStatus.PENDING,
+                correlation_id=correlation_id
+            )
+
+            AuditLog.objects.create(
+                actor=user,
+                actor_role=getattr(user, 'role', 'APPLICANT'),
+                entity_type='ApplicantDocument',
+                entity_id=str(doc.id),
+                action=AuditAction.DOCUMENT_UPLOADED,
+                after_json={'document_type': document_type, 'vault': True, 'quarantined': True},
+                reason="Applicant added document to secure vault (placed in quarantine for security scan)."
+            )
+
+        sync_mode = request.query_params.get('sync', 'false').lower() in ('true', '1')
+        if sync_mode:
+            doc = DocumentIngestionService.process_document(doc.id, correlation_id=correlation_id)
+        else:
+            transaction.on_commit(lambda: process_document_pipeline_task.delay(str(doc.id), correlation_id=correlation_id))
 
         return Response(serialize_vault_document(doc), status=status.HTTP_201_CREATED)
 

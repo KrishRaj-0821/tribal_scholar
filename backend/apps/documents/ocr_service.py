@@ -343,6 +343,25 @@ class OCRService:
             # Conflict Detection & Field Value Integration
             cls._integrate_application_fields_and_detect_conflicts(doc, extracted_candidates, ocr_result)
 
+            # Authoritative Handoff to Verification Queue
+            try:
+                from apps.verification.services import DocumentVerificationService
+                DocumentVerificationService.enqueue_document_for_verification(doc, correlation_id=job.correlation_id)
+            except Exception as v_err:
+                logger.error(f"Failed to auto-enqueue document {doc.id} for verification: {v_err}")
+                try:
+                    AuditLog.objects.create(
+                        actor=None,
+                        actor_role='SYSTEM',
+                        entity_type='ApplicantDocument',
+                        entity_id=str(doc.id),
+                        action=AuditAction.VALIDATE,
+                        after_json={'error': str(v_err), 'correlation_id': job.correlation_id, 'queue_handoff_failed': True},
+                        reason=f"OCR succeeded, but auto-enqueuing to verification queue failed: {v_err}. Retry scheduled on submission."
+                    )
+                except Exception as audit_err:
+                    logger.error(f"Failed to write audit log for queue handoff failure: {audit_err}")
+
             # Mark OCRJob COMPLETED
             job.status = OCRJobStatus.COMPLETED
             job.completed_at = timezone.now()
@@ -489,6 +508,7 @@ class OCRService:
                     # Create Human Verification Queue Item (Officer Review)
                     VerificationQueueItem.objects.create(
                         application=application,
+                        document=doc,
                         item_type=VerificationItemType.DOCUMENT,
                         target_identifier=f"CONFLICT_{cand.field_code}_{doc.id}",
                         confidence_score=cand.confidence,

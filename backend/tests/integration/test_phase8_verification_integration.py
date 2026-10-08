@@ -329,11 +329,11 @@ def test_4_verification_persisted_in_immutable_model(p8_integration_env):
     assert db_rec.verified_value_json == 450000.0
     assert db_rec.officer == officer
 
-    # Confirm ApplicationFieldValue trust rank was promoted to 50
+    # Confirm ApplicationFieldValue trust rank was promoted to OFFICER (60)
     effective = app.get_effective_field_values()
     assert effective["annual_family_income"]["value"] == 450000.0
     assert effective["annual_family_income"]["source"] == FieldValueSource.OFFICER
-    assert effective["annual_family_income"]["trust_rank"] == 50
+    assert effective["annual_family_income"]["trust_rank"] == SOURCE_TRUST_RANK[FieldValueSource.OFFICER]
 
 
 # ==============================================================================
@@ -397,7 +397,7 @@ def test_6_conflict_resolution_persisted_via_api(p8_integration_env):
     assert response.data["decision_action"] == "USE_DOCUMENT_VALUE"
 
     q_item.refresh_from_db()
-    assert q_item.status == VerificationStatus.APPROVED
+    assert q_item.status == VerificationStatus.VERIFIED
     assert q_item.reviewed_by == officer
 
 

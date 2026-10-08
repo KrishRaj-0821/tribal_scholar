@@ -67,10 +67,16 @@ class ApplicationViewSet(viewsets.ModelViewSet):
                     sv = SchemeVersion.objects.filter(scheme__code__icontains=prefix).order_by('-version_number').first()
                 if sv:
                     data['scheme_version'] = str(sv.id)
-            if 'scheme_version' not in data or not data['scheme_version']:
-                sv = SchemeVersion.objects.first()
-                if sv:
-                    data['scheme_version'] = str(sv.id)
+                else:
+                    return Response(
+                        {"error": f"Invalid or unknown scheme code '{scheme_code}'. Scheme could not be resolved."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                return Response(
+                    {"error": "Field 'scheme_version' or explicit valid 'scheme_code' is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -695,6 +701,109 @@ class ApplicationViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response_payload, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='status-timeline')
+    def status_timeline(self, request, pk=None):
+        app = self.get_object()
+        from apps.documents.models import ApplicantDocument, ProvisionalExtractedField
+        from apps.verification.models import VerificationQueueItem
+        
+        events = []
+        # 1. Application Creation
+        events.append({
+            "step": 1,
+            "title": "Application Created & Demographics Seeded",
+            "timestamp": app.created_at.isoformat() if app.created_at else None,
+            "status": "COMPLETED",
+            "details": f"Candidate initiated application {app.application_number} under scheme {app.scheme_version.scheme.code if app.scheme_version else 'N/A'}.",
+        })
+        
+        # 2. Documents
+        docs = ApplicantDocument.objects.filter(application=app).order_by('created_at')
+        if not docs.exists() and app.applicant:
+            docs = ApplicantDocument.objects.filter(applicant=app.applicant.user).order_by('created_at')
+            
+        for doc in docs:
+            events.append({
+                "step": 2,
+                "title": f"Document Uploaded: {doc.get_document_type_display() if hasattr(doc, 'get_document_type_display') else doc.document_type}",
+                "timestamp": doc.uploaded_at.isoformat() if doc.uploaded_at else doc.created_at.isoformat(),
+                "status": "COMPLETED",
+                "details": f"File '{doc.file_name or doc.original_filename}' ({round(doc.file_size_bytes / 1024, 1)} KB) ingested into isolated buffer. Checksum: {doc.sha256[:12]}...",
+            })
+            
+            # Security scan
+            scan_time = doc.malware_scan_timestamp.isoformat() if doc.malware_scan_timestamp else None
+            scan_status = "COMPLETED" if (doc.lifecycle_status in ('SAFE', 'PROCESSED', 'VERIFIED') or doc.malware_scan_status == 'CLEAN') else ("FAILED" if doc.malware_scan_status == 'INFECTED' else "IN_PROGRESS")
+            events.append({
+                "step": 3,
+                "title": f"Security & Anti-Malware Gate: {doc.file_name or doc.original_filename}",
+                "timestamp": scan_time,
+                "status": scan_status,
+                "details": f"ClamAV scan status: {doc.malware_scan_status}. Lifecycle status: {doc.lifecycle_status}.",
+            })
+            
+            # OCR Extraction
+            prov_fields = ProvisionalExtractedField.objects.filter(document=doc)
+            if prov_fields.exists():
+                field_summary = ", ".join([f"{f.field_code}: {f.normalized_value or f.raw_value}" for f in prov_fields[:3]])
+                events.append({
+                    "step": 4,
+                    "title": f"Multi-Lingual OCR Extraction: {doc.file_name or doc.original_filename}",
+                    "timestamp": doc.processed_at.isoformat() if doc.processed_at else scan_time,
+                    "status": "COMPLETED",
+                    "details": f"Extracted provisional fields: {field_summary}.",
+                })
+            elif doc.lifecycle_status in ('SAFE', 'PROCESSING'):
+                events.append({
+                    "step": 4,
+                    "title": f"OCR Extraction: {doc.file_name or doc.original_filename}",
+                    "timestamp": None,
+                    "status": "IN_PROGRESS",
+                    "details": "Document promoted to safe storage. OCR extraction in progress.",
+                })
+
+        # 3. Verification Queue / Officer Scrutiny
+        queue_item = VerificationQueueItem.objects.filter(application=app).first()
+        is_verified = (app.current_state and app.current_state.code == 'VERIFIED') or (queue_item and queue_item.status in ('APPROVED', 'VERIFIED'))
+        officer = (queue_item.reviewed_by or queue_item.assigned_to) if queue_item else None
+        officer_name = officer.username if officer else 'Awaiting Assignment'
+        verified_at_str = (queue_item.reviewed_at or queue_item.assigned_at).isoformat() if (queue_item and (queue_item.reviewed_at or queue_item.assigned_at)) else None
+
+        events.append({
+            "step": 5,
+            "title": f"Officer Scrutiny & Conflict Resolution {'(COMPLETED)' if is_verified else '(IN PROGRESS)'}",
+            "timestamp": verified_at_str,
+            "status": "COMPLETED" if is_verified else "IN_PROGRESS",
+            "details": f"Officer scrutiny status: {queue_item.status if queue_item else (app.current_state.code if app.current_state else 'PENDING')}. Assigned officer: {officer_name}.",
+        })
+
+        # 4. Eligibility Reevaluation
+        eval_record = EligibilityEvaluation.objects.filter(application=app).order_by('-evaluated_at').first()
+        if eval_record:
+            events.append({
+                "step": 6,
+                "title": "Deterministic Scheme Eligibility Evaluated",
+                "timestamp": eval_record.evaluated_at.isoformat() if eval_record.evaluated_at else None,
+                "status": "COMPLETED",
+                "details": f"Engine result: {eval_record.result}. Hash: {eval_record.result_hash[:12] if eval_record.result_hash else 'N/A'}.",
+            })
+        else:
+            events.append({
+                "step": 6,
+                "title": "Scheme Eligibility Evaluation",
+                "timestamp": None,
+                "status": "PENDING",
+                "details": "Awaiting final scrutiny verification for rule engine evaluation.",
+            })
+
+        return Response({
+            "application_id": str(app.id),
+            "application_number": app.application_number,
+            "current_state": app.current_state.code if app.current_state else "UNKNOWN",
+            "is_verified": is_verified,
+            "events": events
+        }, status=status.HTTP_200_OK)
 
 
 class EligibilityEvaluationViewSet(viewsets.ReadOnlyModelViewSet):
